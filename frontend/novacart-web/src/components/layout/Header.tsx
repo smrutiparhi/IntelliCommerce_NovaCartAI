@@ -1,16 +1,28 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Search, ShoppingCart, Sparkles, User, ChevronDown, Moon, Sun } from 'lucide-react'
+import { useMutation } from '@tanstack/react-query'
+import { Search, ShoppingCart, Sparkles, User, LogOut, ChevronDown, Moon, Sun } from 'lucide-react'
 import { useAuthStore } from '../../stores/auth-store'
 import { useAIStore } from '../../stores/ai-store'
 import { useTheme } from '../../hooks/useTheme'
+import { logout as logoutRequest } from '../../api/auth'
 
 export function Header() {
   const { theme, toggleTheme } = useTheme()
-  const { isAuthenticated, user } = useAuthStore()
+  const { isAuthenticated, user, clearAuth } = useAuthStore()
   const { searchQuery, setSearchQuery } = useAIStore()
   const navigate = useNavigate()
   const [localSearch, setLocalSearch] = useState(searchQuery)
+
+  const logoutMutation = useMutation({
+    mutationFn: logoutRequest,
+    // Always clear local state, even if the network call fails — a user clicking
+    // "logout" should never be stuck signed-in client-side over a transient error.
+    onSettled: () => {
+      clearAuth()
+      navigate('/', { replace: true })
+    },
+  })
 
   function handleSearchSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -83,13 +95,24 @@ export function Header() {
           </Link>
 
           {isAuthenticated ? (
-            <Link
-              to="/profile"
-              className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-body-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-dark-border dark:bg-dark-surface dark:text-slate-200 transition-colors shadow-sm"
-            >
-              <User className="h-4 w-4" />
-              <span>{user?.fullName.split(' ')[0]}</span>
-            </Link>
+            <>
+              <Link
+                to="/profile"
+                className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-body-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-dark-border dark:bg-dark-surface dark:text-slate-200 transition-colors shadow-sm"
+              >
+                <User className="h-4 w-4" />
+                <span>{user?.fullName.split(' ')[0]}</span>
+              </Link>
+              <button
+                type="button"
+                onClick={() => logoutMutation.mutate()}
+                disabled={logoutMutation.isPending}
+                aria-label="Log out"
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-dark-border dark:bg-dark-surface dark:text-slate-200 transition-colors shadow-sm"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            </>
           ) : (
             <Link
               to="/login"
