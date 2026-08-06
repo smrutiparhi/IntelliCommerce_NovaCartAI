@@ -25,6 +25,14 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-actuator</artifactId>
     </dependency>
+    <!-- Eureka's default dashboard is JSP-based, and Spring Boot's embedded Tomcat
+         doesn't bundle JSP support by default — without this, requests to "/" fail
+         to render (and, in this environment, a secondary logging bug obscured the
+         real error rather than surfacing a clean stack trace). -->
+    <dependency>
+      <groupId>org.apache.tomcat.embed</groupId>
+      <artifactId>tomcat-embed-jasper</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>
