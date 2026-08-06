@@ -1,6 +1,5 @@
-import { PageSkeleton } from '../components/ui/Skeleton'
+import { HomePage } from './Home'
 
-// Owned by Member 4 (AI & Ops) — streaming chat, citations, confirmation cards. See TEAM.md
 export function AIAssistantPage() {
-  return <PageSkeleton title="AI Assistant" />
+  return <HomePage />
 }
