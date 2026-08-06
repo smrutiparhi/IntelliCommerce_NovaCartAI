@@ -1,0 +1,30 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: auth-service
+  config:
+    import: "configserver:http://localhost:8888"
+  data:
+    mongodb:
+      uri: ${AUTH_DB_URI:mongodb://localhost:27017/auth_db}
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+jwt:
+  private-key-path: ${JWT_PRIVATE_KEY_PATH}
+  public-key-path: ${JWT_PUBLIC_KEY_PATH}
+  access-token-minutes: 15
+  refresh-token-days: 7
+
+app:
+  cookie:
+    secure: false # MUST be true in any HTTPS environment — CLAUDE.md §9. false only for local plain-HTTP dev.
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

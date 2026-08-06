@@ -86,3 +86,33 @@
 **Gotcha worth recording:** properties from Config Server's imported sources (`spring.config.import: "configserver:..."`) take precedence over a service's own local `application.yml`, and array-valued properties (like `management.endpoints.web.exposure.include`) *replace* rather than merge across property sources. The Gateway's local `application.yml` requested `health,info,gateway`, but the shared `config-repo/application.yml`'s `health,info` silently won until `gateway` was added explicitly to `config-repo/api-gateway.yml`. Anyone adding actuator endpoints to a new service should expect the same and set exposure in that service's own config-repo file, not rely on the local jar's setting.
 
 **Consequences:** Makes config easy to review in the same PR as the code change it affects, and one less repo/credential for 3 AI-light teammates to manage. Makes a future move to per-environment config branches (if cloud deployment resumes, see ADR-004/DEFERRED.md) a deliberate migration rather than something that falls out for free — acceptable, not needed yet.
+
+---
+
+## ADR-006: Opaque refresh tokens, not JWTs
+
+**Date:** 2026-08-06 **Status:** Accepted
+
+**Context:** CLAUDE.md §9 requires refresh tokens with rotation and reuse detection, stored hashed. The access token is a signed JWT (RS256, required for stateless verification across services). The refresh token needed a format decision too.
+
+**Options considered:**
+- **A — Refresh token is also a JWT** (signed, with its own claims/expiry). Rejected: all the metadata a refresh token needs (userId, family for rotation, expiry, revocation state) already has to live in Mongo to support revocation and reuse detection — a self-contained signed token would just be redundant with the DB row, and adds signature-verification cost for no benefit since it's always looked up by hash anyway.
+- **B — Opaque, high-entropy random string (512 bits), stored only as a SHA-256 hash.** Chosen.
+
+**Decision:** Option B. `JwtTokenProvider.generateOpaqueRefreshToken()` produces the raw token (returned to the client once, set as an httpOnly cookie); only its hash is ever persisted (`RefreshToken.tokenHash`).
+
+**Consequences:** Simpler mental model — the refresh token is a bearer credential you look up, not something you parse. Verified end-to-end during Phase 7 testing: rotation on refresh, and reuse detection (presenting an already-rotated token revokes the entire token family, including the legitimately-issued replacement) both work as specified.
+
+---
+
+## ADR-007: Phase 7 implementation notes (bugs found and fixed during verification)
+
+**Date:** 2026-08-06 **Status:** Accepted
+
+Three real issues were found and fixed while verifying Auth Service + Gateway end-to-end, not just written and assumed correct:
+
+1. **Missing `AuthenticationEntryPoint` → wrong status code.** Without an explicit one configured, Spring Security's default behavior for a request with no/invalid/blocklisted JWT on an `authenticated()` endpoint is an empty-bodied **403**, not the **401** CLAUDE.md §3.4 specifies ("401 unauthenticated · 403 unauthorised" are different things). Fixed with a custom `RestAuthenticationEntryPoint` in both Auth Service and the Gateway's reactive filter, returning a proper 401 in the standard error envelope.
+2. **`RequestRateLimiter`'s auto-configured filter factory requires exactly one unqualified `KeyResolver` bean**, even though route-level YAML can reference a second one explicitly by name (`#{@authIpKeyResolver}`) for the stricter `/auth/*` limit. Fixed by marking the default (`ipKeyResolver`) `@Primary`.
+3. **RedisRateLimiter's Redis key is derived solely from what the `KeyResolver` returns** — reusing the same resolver (bare client IP) across two different `RequestRateLimiter` filter instances would make them silently share one bucket instead of rate-limiting independently. Fixed by prefixing the auth-specific resolver's output (`"auth:" + ip`), giving it a distinct bucket from the global default.
+
+**Why this is recorded here:** these are exactly the kind of gotchas that don't show up from reading the code, only from actually running it — recording them so the next service built against this same pattern (any teammate adding JWT-protected endpoints, or another `RequestRateLimiter` route) doesn't rediscover them the hard way.

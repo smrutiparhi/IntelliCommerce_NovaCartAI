@@ -99,34 +99,40 @@ C4Container
 
 Chosen as the component-level example because it's the first service being built (Member 1's slice). Other members are welcome to add their own service's component diagram here as they design it — same notation.
 
+Updated post-implementation (Phase 7) — rate limiting actually lives at the Gateway (CLAUDE.md §5.4/§9 both place it there), not inside Auth Service as originally sketched here; Auth Service instead independently re-verifies every JWT itself for defense in depth (CLAUDE.md §5.4), which the original sketch didn't show.
+
 ```mermaid
 C4Component
   title Component Diagram — Auth Service
 
-  Container(gateway, "API Gateway", "Spring Cloud Gateway")
+  Container(gateway, "API Gateway", "Spring Cloud Gateway", "Also does JWT validation + rate limiting — see below")
 
   System_Boundary(auth, "Auth Service") {
     Component(controller, "AuthController", "Spring MVC REST Controller", "Exposes /api/v1/auth/* — register, login, refresh, logout, reset")
     Component(service, "AuthService", "Application Service", "Registration/login business logic, orchestrates token issuance")
-    Component(jwt, "JwtTokenProvider", "Component", "Signs/verifies RS256 access + refresh tokens")
-    Component(security, "SecurityConfig", "Spring Security Filter Chain", "BCrypt password encoding, method-level security")
-    Component(rateLimiter, "AuthRateLimitFilter", "Resilience4j + Redis", "5/min throttle on auth endpoints")
+    Component(jwt, "JwtTokenProvider", "Component", "Signs access tokens (RS256) + generates opaque refresh tokens (ADR-006)")
+    Component(jwtFilter, "JwtAuthenticationFilter", "Servlet Filter", "Independently re-verifies the JWT server-side (defense in depth) — doesn't just trust Gateway headers")
+    Component(security, "SecurityConfig", "Spring Security Filter Chain", "BCrypt-12 password encoding")
+    Component(blocklist, "TokenBlocklistService", "Redis-backed", "Logout blocklists a token's jti until natural expiry")
     Component(repo, "UserRepository / RefreshTokenRepository", "Spring Data MongoDB", "Persistence")
   }
 
-  ContainerDb(authdb, "auth_db", "MongoDB", "users, refresh_tokens")
-  ContainerDb(redis, "Redis", "Redis", "JWT blocklist, rate-limit buckets")
+  ContainerDb(authdb, "auth_db", "MongoDB", "users, refresh_tokens, password_reset_tokens")
+  ContainerDb(redis, "Redis", "Redis", "JWT blocklist (shared with Gateway's own revocation check)")
 
-  Rel(gateway, controller, "Routes requests", "HTTPS/REST")
-  Rel(controller, rateLimiter, "Checked by")
+  Rel(gateway, controller, "Routes requests (Gateway already validated the JWT once)", "HTTPS/REST")
+  Rel(controller, jwtFilter, "Requests re-verified by")
   Rel(controller, service, "Delegates to")
   Rel(service, jwt, "Issues/validates tokens via")
   Rel(service, security, "Encodes/verifies passwords via")
+  Rel(service, blocklist, "Blocklists on logout via")
   Rel(service, repo, "Reads/writes")
   Rel(repo, authdb, "Persists to")
-  Rel(rateLimiter, redis, "Reads/writes buckets in")
-  Rel(jwt, redis, "Checks/writes blocklist in")
+  Rel(jwtFilter, redis, "Checks blocklist in")
+  Rel(blocklist, redis, "Writes blocklist entries to")
 ```
+
+**Gateway's own JWT + rate-limiting components** (added Phase 7, not shown in the Container diagram above since they're internal to the Gateway, not a separate deployable): `JwtValidationFilter` (verifies signature+expiry+Redis revocation, injects `X-User-Id`/`X-User-Roles` downstream, exempts the public auth endpoints), plus Spring Cloud Gateway's built-in `RequestRateLimiter` (Redis-backed token bucket) applied globally via `default-filters` and again, more strictly, on the `/auth/*` route specifically.
 
 ## 4. Service Boundary Justification
 

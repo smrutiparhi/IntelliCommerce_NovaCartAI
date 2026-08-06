@@ -37,6 +37,7 @@
     <module>infra/eureka-server</module>
     <module>infra/config-server</module>
     <module>infra/api-gateway</module>
+    <module>services/auth-service</module>
   </modules>
 
   <dependencyManagement>

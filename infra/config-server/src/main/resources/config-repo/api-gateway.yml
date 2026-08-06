@@ -19,11 +19,33 @@ spring:
       # instance to route to until that service registers, which is the expected state
       # until Phases 7-17 land. Routing is centrally defined here in Config Server so
       # no service needs to touch Gateway code to get wired in.
+      # Global default: generous, applies to every route uniformly (CLAUDE.md §9's
+      # "global rate limiting"). RedisRateLimiter is a per-second token bucket, so
+      # "N per minute" isn't natively expressible — replenishRate/burstCapacity below
+      # are the closest honest approximation, not an exact 5-requests-per-60s window.
+      default-filters:
+        - name: RequestRateLimiter
+          args:
+            key-resolver: "#{@ipKeyResolver}"
+            redis-rate-limiter.replenishRate: 20
+            redis-rate-limiter.burstCapacity: 40
+            redis-rate-limiter.requestedTokens: 1
+
       routes:
         - id: auth-service
           uri: lb://auth-service
           predicates:
             - Path=/api/v1/auth/**
+          filters:
+            # Stricter, on top of the global default — uses a distinct KeyResolver
+            # (prefixed "auth:") so this doesn't share a Redis bucket with the global
+            # limiter above. Approximates "5/min" as 1 token/sec refill, burst of 5.
+            - name: RequestRateLimiter
+              args:
+                key-resolver: "#{@authIpKeyResolver}"
+                redis-rate-limiter.replenishRate: 1
+                redis-rate-limiter.burstCapacity: 5
+                redis-rate-limiter.requestedTokens: 1
         - id: product-service
           uri: lb://product-service
           predicates:

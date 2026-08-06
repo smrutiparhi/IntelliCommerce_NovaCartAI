@@ -6,6 +6,13 @@ spring:
     name: api-gateway
   config:
     import: "configserver:http://localhost:8888"
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+jwt:
+  public-key-path: ${JWT_PUBLIC_KEY_PATH}
 
 management:
   endpoints:

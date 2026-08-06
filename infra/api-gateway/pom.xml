@@ -16,9 +16,36 @@
   <name>NovaCart API Gateway</name>
   <description>Edge routing, CORS, trace propagation. JWT validation + rate limiting arrive in Phase 7 alongside Auth/Redis.</description>
 
+  <properties>
+    <jjwt.version>0.13.0</jjwt.version>
+  </properties>
+
   <dependencies>
     <!-- Reactive (WebFlux) — do NOT add spring-boot-starter-web alongside this, Spring
          Cloud Gateway's classic implementation requires WebFlux, not Servlet MVC. -->
+    <!-- Verification only — the Gateway never holds the private signing key. -->
+    <dependency>
+      <groupId>com.novacart</groupId>
+      <artifactId>novacart-common</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.jsonwebtoken</groupId>
+      <artifactId>jjwt-api</artifactId>
+      <version>${jjwt.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.jsonwebtoken</groupId>
+      <artifactId>jjwt-impl</artifactId>
+      <version>${jjwt.version}</version>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.jsonwebtoken</groupId>
+      <artifactId>jjwt-jackson</artifactId>
+      <version>${jjwt.version}</version>
+      <scope>runtime</scope>
+    </dependency>
     <dependency>
       <groupId>org.springframework.cloud</groupId>
       <artifactId>spring-cloud-starter-gateway</artifactId>
@@ -30,6 +57,12 @@
     <dependency>
       <groupId>org.springframework.cloud</groupId>
       <artifactId>spring-cloud-starter-config</artifactId>
+    </dependency>
+    <!-- Reactive Redis — backs both the built-in RedisRateLimiter and the JWT
+         revocation-blocklist check, both of which must be non-blocking under WebFlux. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-redis-reactive</artifactId>
     </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
