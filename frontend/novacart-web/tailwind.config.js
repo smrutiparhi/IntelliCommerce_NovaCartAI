@@ -29,11 +29,16 @@ export default {
           surface: '#131320',
           border: '#1f1f2e',
         },
+        cream: {
+          DEFAULT: '#f3f1ec',
+          surface: '#faf9f6',
+        },
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
       },
       fontSize: {
+        hero: ['clamp(3rem, 8vw, 6.5rem)', { lineHeight: '0.95', letterSpacing: '-0.03em' }],
         display: ['3.5rem', { lineHeight: '1.1', letterSpacing: '-0.02em' }],
         h1: ['2.5rem', { lineHeight: '1.15', letterSpacing: '-0.02em' }],
         h2: ['2rem', { lineHeight: '1.2', letterSpacing: '-0.01em' }],
