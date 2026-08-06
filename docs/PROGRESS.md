@@ -14,7 +14,7 @@
 | 3 | Database design | Done ([DATABASE.md](DATABASE.md)) |
 | 4 | UI/UX & design system | Done ([DESIGN_SYSTEM.md](DESIGN_SYSTEM.md)) |
 | 5 | Frontend shell | Done — `frontend/novacart-web/`, builds and runs (`npm run dev`, `npm run build` both verified) |
-| 6 | Infrastructure trio (Eureka/Config/Gateway) | Not started |
+| 6 | Infrastructure trio (Eureka/Config/Gateway) | Done — all 3 running and verified: Gateway registers with Eureka, Config Server serves merged config correctly, routes proxy (503 gracefully with no backend yet, 404 on undefined paths) |
 | 7 | Auth service | Not started |
 | 8 | Product service | Not started |
 | 9 | Inventory service | Not started |
@@ -34,7 +34,7 @@
 | 25 | Final review | Not started |
 
 ## In Flight
-Phase 5 (Frontend shell) done — Vite+TS+Tailwind app at `frontend/novacart-web/`, full routing for every §10.3 page (real pages: Landing, Login, Register, Forgot/Reset Password, 404, 500; skeleton placeholders for the rest, labeled by owning member per TEAM.md), dark mode, typed API client with silent-refresh interceptor, Zustand auth store, auth guard with role support. Build verified (176 KB gzipped, under the 200 KB budget) and dev server verified serving correctly. Awaiting confirmation before Phase 6 (Infrastructure trio).
+Phase 6 (Infrastructure trio) done. Maven Wrapper (`./mvnw`) committed to repo root — pinned to Maven 3.9.16, self-bootstraps, no system-wide Maven install needed by anyone on the team going forward. Parent POM pins Spring Boot 3.3.13 / Spring Cloud 2023.0.6 (verified compatible via web search, not guessed). Eureka (8761), Config Server (8888, native/filesystem-backed — ADR-005), and API Gateway (8080, all 8 planned service routes pre-declared, CORS for the frontend dev server, trace-ID propagation filter) all build and run. Gateway confirmed registered in Eureka; routes confirmed proxying (graceful 503 for not-yet-built services, 404 for undefined paths). All 3 services currently running locally for inspection — Eureka dashboard at http://localhost:8761. Awaiting confirmation before Phase 7 (Auth service).
 
 ## Blocked
 None currently. Teammates 2-4's Copilot access (GitHub Student Developer Pack) is pending verification — not a blocker for starting, but affects how soon Catalog & Discovery (Member 2) can parallelize per TEAM.md.

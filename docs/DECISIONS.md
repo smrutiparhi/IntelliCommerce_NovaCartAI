@@ -67,3 +67,22 @@
 **Decision:** Option B. Claude Code's actual implementation work (via this session) is scoped to **Member 1's slice only** — Platform & Identity (Eureka, Config Server, Gateway, `novacart-common`, Auth service, app shell, Auth pages, DevOps). Members 2-4 build Catalog & Discovery, Transactions & Saga, and AI & Ops respectively, independently, pulling from the shared repo. Whole-system planning phases (2-4: architecture, DB design, UI/UX design system) remain shared deliverables produced collaboratively, since every slice needs to agree on the same conventions, schema, and design tokens — only the implementation phases (5+) split by ownership. To reduce friction for teammates without heavy AI assistance, Claude Code will scaffold the **full repo skeleton** (all service folders as buildable Maven/Spring Boot modules wired to Eureka/Config, correct package layers per CLAUDE.md §3.2, docker-compose entries, README pointing to each slice's user stories) even though only Member 1's slice gets built out in depth by this session — teammates fill in business logic within an already-correct structure rather than bootstrapping from nothing.
 
 **Consequences:** Makes it possible for every member to genuinely defend their own code. Makes the timeline dependent on 3 people's independent (and currently AI-light) velocity again — the honest ~24-32 day estimate from ADR-002 no longer applies cleanly; actual pace now depends on how fast Copilot lands and how much time teammates can put in, which this session can't observe directly. Revisit this ADR if a teammate's slice stalls badly enough that centralizing it back (ADR-002-style) becomes the pragmatic choice.
+
+---
+
+## ADR-005: Config Server backend — native (filesystem), not git-backed
+
+**Date:** 2026-08-06 **Status:** Accepted
+
+**Context:** Spring Cloud Config Server needs a backend for storing service configuration. The two common options are a separate git repository (the traditional/most-documented approach) or the `native` profile, which serves config files straight from the classpath/filesystem — no second repo involved.
+
+**Options considered:**
+- **A — Git-backed.** Traditional approach, supports versioning/webhooks/multiple environments cleanly, but requires standing up and maintaining a *second* repository just for config, plus auth to reach it — overhead disproportionate to a project already centralizing everything in one monorepo (CLAUDE.md §3.1).
+- **B — Native (filesystem), bundled at `infra/config-server/src/main/resources/config-repo/`.** Chosen. Config lives in the same repo, versioned in the same commits as the code it configures, no second credential/URL to manage. Trade-off: no built-in config-change webhook or multi-label/branch environment story — acceptable, since this project doesn't need per-environment config branching yet.
+- **C — No Config Server at all, plain `application.yml` per service.** Rejected: CLAUDE.md §3.1/§5 explicitly calls for a Config Server as one of the infra trio, and centralizing cross-service settings (Eureka URL, actuator exposure) in one place is genuinely useful once there are 10 services instead of 3.
+
+**Decision:** Native profile, config files under `infra/config-server/src/main/resources/config-repo/` (bundled into the jar via classpath, not a `file:` path — a relative filesystem path was tried first and rejected as fragile, since it breaks depending on the working directory the jar is launched from).
+
+**Gotcha worth recording:** properties from Config Server's imported sources (`spring.config.import: "configserver:..."`) take precedence over a service's own local `application.yml`, and array-valued properties (like `management.endpoints.web.exposure.include`) *replace* rather than merge across property sources. The Gateway's local `application.yml` requested `health,info,gateway`, but the shared `config-repo/application.yml`'s `health,info` silently won until `gateway` was added explicitly to `config-repo/api-gateway.yml`. Anyone adding actuator endpoints to a new service should expect the same and set exposure in that service's own config-repo file, not rely on the local jar's setting.
+
+**Consequences:** Makes config easy to review in the same PR as the code change it affects, and one less repo/credential for 3 AI-light teammates to manage. Makes a future move to per-environment config branches (if cloud deployment resumes, see ADR-004/DEFERRED.md) a deliberate migration rather than something that falls out for free — acceptable, not needed yet.

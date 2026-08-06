@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.novacart</groupId>
+    <artifactId>novacart-ai</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../../pom.xml</relativePath>
+  </parent>
+
+  <artifactId>novacart-common</artifactId>
+  <packaging>jar</packaging>
+  <name>NovaCart Common</name>
+  <description>Shared event envelope, API response DTOs, and enums only — no business logic, entities, or repositories</description>
+
+  <!-- Deliberately dependency-free: plain records over java.time only. Any consuming
+       service already brings Jackson/validation transitively via its own Boot starter. -->
+</project>

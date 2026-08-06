@@ -1,0 +1,25 @@
+server:
+  port: 8888
+
+spring:
+  application:
+    name: config-server
+  profiles:
+    active: native
+  cloud:
+    config:
+      server:
+        native:
+          # classpath, not a file: path — a relative filesystem path here is fragile
+          # (breaks depending on whether you launch via `mvn spring-boot:run` from this
+          # module or `java -jar` from elsewhere). Bundling into the JAR is robust either way.
+          search-locations: classpath:/config-repo
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always

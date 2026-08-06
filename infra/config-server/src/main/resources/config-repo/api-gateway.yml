@@ -1,0 +1,62 @@
+management:
+  endpoint:
+    gateway:
+      enabled: true # separate from exposure — some actuator endpoints need both
+  endpoints:
+    web:
+      exposure:
+        # Overrides the shared application.yml's list — config-repo/application.yml's
+        # exposure list takes precedence over each service's local bundled config, and
+        # array properties replace rather than merge, so gateway-specific additions
+        # have to be restated here rather than assumed to append.
+        include: health,info,gateway
+
+spring:
+  cloud:
+    gateway:
+      # Every route below is pre-declared even though most target services don't exist
+      # yet (per ADR-003, each teammate builds their own) — Eureka will simply have no
+      # instance to route to until that service registers, which is the expected state
+      # until Phases 7-17 land. Routing is centrally defined here in Config Server so
+      # no service needs to touch Gateway code to get wired in.
+      routes:
+        - id: auth-service
+          uri: lb://auth-service
+          predicates:
+            - Path=/api/v1/auth/**
+        - id: product-service
+          uri: lb://product-service
+          predicates:
+            - Path=/api/v1/products/**,/api/v1/categories/**
+        - id: inventory-service
+          uri: lb://inventory-service
+          predicates:
+            - Path=/api/v1/inventory/**
+        - id: cart-service
+          uri: lb://cart-service
+          predicates:
+            - Path=/api/v1/cart/**,/api/v1/wishlist/**
+        - id: order-service
+          uri: lb://order-service
+          predicates:
+            - Path=/api/v1/orders/**
+        - id: payment-service
+          uri: lb://payment-service
+          predicates:
+            - Path=/api/v1/payments/**,/api/v1/coupons/**
+        - id: notification-service
+          uri: lb://notification-service
+          predicates:
+            - Path=/api/v1/notifications/**
+        - id: ai-assistant-service
+          uri: lb://ai-assistant-service
+          predicates:
+            - Path=/api/v1/assistant/**
+
+      globalcors:
+        cors-configurations:
+          "[/**]":
+            allowedOrigins: "http://localhost:5173"
+            allowedMethods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+            allowedHeaders: "*"
+            allowCredentials: true # frontend sends the httpOnly refresh cookie with withCredentials:true
