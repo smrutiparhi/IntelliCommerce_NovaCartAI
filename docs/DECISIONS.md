@@ -47,6 +47,23 @@
 - **B — Full independent ownership: each member builds their own slice with whatever tooling they have (Copilot once it lands, free-tier AI, or unassisted), coordinating via a shared git repo.** Chosen.
 - **C — Hybrid: Member 1 builds the hardest 2 slices (Saga, AI), teammates build the 2 more mechanical ones (Platform, Catalog).** Not chosen — the user's phrasing ("I'll do my work, they'll do theirs") maps to each person keeping their originally assigned slice from `TEAM.md`, not a reassignment by difficulty. Revisit if a teammate's slice stalls.
 
+---
+
+## ADR-004: Cloud provider — Azure
+
+**Date:** 2026-08-06 **Status:** Accepted
+
+**Context:** CLAUDE.md §4/§11 requires picking AWS or Azure in Phase 2 and recording an ADR, even though actual cloud deployment execution is deferred (`DEFERRED.md`) until the core build is solid. The choice still needs making now so later documentation (deployment plan, cost estimate, IAM/secrets patterns referenced in interviews) is consistent rather than hand-waved. CLAUDE.md §11 also explicitly demands a "free-tier-first" mindset — "a student portfolio project that runs up a bill is a failed project."
+
+**Options considered:**
+- **A — AWS (ECS Fargate + ALB + ECR + Secrets Manager + CloudWatch).** More common in interview contexts and has the deepest community documentation for Spring Boot on Fargate, but the free tier still typically requires a card on file and has tighter always-free limits.
+- **B — Azure (Container Apps + ACR + Key Vault).** Chosen. The team is already pursuing GitHub Student Developer Pack for Copilot access (see `TEAM.md`/ADR-003), and that pack includes Azure for Students credit (~$100-200, no credit card required) — directly serving the free-tier-first requirement. Container Apps is a comparable modern PaaS to Fargate for this workload.
+- **C — Defer the choice entirely until deployment actually happens.** Rejected: CLAUDE.md asks for the decision now, and later phases' documentation benefits from a concrete target rather than "TBD."
+
+**Decision:** Azure (Container Apps, ACR, Key Vault), contingent on the Student Pack credit actually coming through for the team.
+
+**Consequences:** Makes later cloud-deployment documentation (Phase 21, currently deferred) target Azure specifically. Makes it easy to actually execute a deployment for free if/when that phase is reached. If Student Pack Azure credit doesn't materialize for some reason, revisit — AWS remains a fine fallback with no functional requirement favoring one over the other for this project.
+
 **Decision:** Option B. Claude Code's actual implementation work (via this session) is scoped to **Member 1's slice only** — Platform & Identity (Eureka, Config Server, Gateway, `novacart-common`, Auth service, app shell, Auth pages, DevOps). Members 2-4 build Catalog & Discovery, Transactions & Saga, and AI & Ops respectively, independently, pulling from the shared repo. Whole-system planning phases (2-4: architecture, DB design, UI/UX design system) remain shared deliverables produced collaboratively, since every slice needs to agree on the same conventions, schema, and design tokens — only the implementation phases (5+) split by ownership. To reduce friction for teammates without heavy AI assistance, Claude Code will scaffold the **full repo skeleton** (all service folders as buildable Maven/Spring Boot modules wired to Eureka/Config, correct package layers per CLAUDE.md §3.2, docker-compose entries, README pointing to each slice's user stories) even though only Member 1's slice gets built out in depth by this session — teammates fill in business logic within an already-correct structure rather than bootstrapping from nothing.
 
 **Consequences:** Makes it possible for every member to genuinely defend their own code. Makes the timeline dependent on 3 people's independent (and currently AI-light) velocity again — the honest ~24-32 day estimate from ADR-002 no longer applies cleanly; actual pace now depends on how fast Copilot lands and how much time teammates can put in, which this session can't observe directly. Revisit this ADR if a teammate's slice stalls badly enough that centralizing it back (ADR-002-style) becomes the pragmatic choice.

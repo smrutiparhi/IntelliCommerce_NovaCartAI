@@ -9,9 +9,9 @@
 
 | # | Phase | Status |
 |---|---|---|
-| 1 | Requirement analysis | Drafted — awaiting confirmation ([REQUIREMENTS.md](REQUIREMENTS.md)) |
-| 2 | System architecture | Not started |
-| 3 | Database design | Not started |
+| 1 | Requirement analysis | Done ([REQUIREMENTS.md](REQUIREMENTS.md)) |
+| 2 | System architecture | Done ([ARCHITECTURE.md](ARCHITECTURE.md), ADR-004) |
+| 3 | Database design | Drafted — awaiting confirmation ([DATABASE.md](DATABASE.md)) |
 | 4 | UI/UX & design system | Not started |
 | 5 | Frontend shell | Not started |
 | 6 | Infrastructure trio (Eureka/Config/Gateway) | Not started |
@@ -34,7 +34,7 @@
 | 25 | Final review | Not started |
 
 ## In Flight
-Phase 1 (Requirement analysis) drafted; scope (REQUIREMENTS.md §7 / DEFERRED.md) stays as-is now that deadline pressure is off. Awaiting go-ahead to start Phase 2.
+Phase 3 (Database Design) drafted — per-service schemas for all 8 in-scope databases, ER diagram, denormalization register, index plan. Awaiting confirmation before Phase 4 (UI/UX & Design System).
 
 ## Blocked
 None currently. Teammates 2-4's Copilot access (GitHub Student Developer Pack) is pending verification — not a blocker for starting, but affects how soon Catalog & Discovery (Member 2) can parallelize per TEAM.md.
