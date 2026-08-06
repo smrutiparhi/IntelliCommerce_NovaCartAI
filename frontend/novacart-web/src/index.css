@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-feature-settings: 'cv11', 'ss01';
+  }
+
+  body {
+    @apply bg-white text-slate-900 antialiased;
+    @apply dark:bg-dark-bg dark:text-slate-100;
+  }
+
+  ::selection {
+    @apply bg-primary-500/20;
+  }
+}
+
+@layer utilities {
+  .measure {
+    max-width: 65ch;
+  }
+}
