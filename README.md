@@ -6,6 +6,15 @@ A cloud-native, event-driven, AI-powered e-commerce platform built on Service-Or
 
 Built as a 4-person team project, each member independently owning a vertical slice of the system (see [Team & Ownership](#team--ownership)).
 
+## Team Members
+
+| Roll Number | Name |
+|---|---|
+| 2410030208 | N Hemanth Babu (Lead) |
+| 2410030048 | Alok Kumar Singh |
+| 2410030110 | Smruti Ranjan Parhi |
+| 2410030114 | Arjun |
+
 ---
 
 ## What makes this worth looking at
