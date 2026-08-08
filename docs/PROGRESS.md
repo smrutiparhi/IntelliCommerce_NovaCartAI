@@ -2,7 +2,7 @@
 
 **Timeline:** no hard deadline forced (revised 2026-08-06) — original Aug 20/25 target didn't fit the earlier centralized execution model, and the team chose to take the time the current scope needs rather than force the date. No single critical-path estimate applies now that implementation is independent per member (ADR-003). See [TEAM.md](TEAM.md).
 **Team:** 4 members, vertical-slice split, **each building their own slice independently via a shared git repo** (ADR-003, 2026-08-06 — supersedes the earlier centralized model in ADR-002). Claude Code's implementation work in this session is scoped to Member 1's slice (Platform & Identity) plus the full repo skeleton for all slices. Only Member 1 has Claude Code; teammates' GitHub Copilot access (Student Pack) is pending.
-**Repo:** [github.com/smrutiparhi/SOA_PROJECT](https://github.com/smrutiparhi/SOA_PROJECT) — linked 2026-08-06, `main` branch.
+**Repo:** [github.com/smrutiparhi/IntelliCommerce_NovaCartAI](https://github.com/smrutiparhi/IntelliCommerce_NovaCartAI) — linked 2026-08-06 as `SOA_PROJECT`, renamed since (old URL still redirects), `main` branch.
 **Project restarted:** 2026-08-06 (prior scaffolding lost, see `DECISIONS.md` context — cause unknown, not recoverable).
 
 ## Phase Status
