@@ -1,0 +1,401 @@
+version: '3.8'
+
+# ════════════════════════════════════════════════════════════════════════════
+#  NovaCart AI — docker-compose.yml
+#
+#  USAGE
+#  -----
+#  Start infrastructure only (databases, brokers):
+#    docker compose --profile infra up -d
+#
+#  Start Member 1's platform services (infra + Eureka/Config/Gateway/Auth):
+#    docker compose --profile infra --profile platform up -d
+#
+#  Start everything once teammates add their Dockerfiles:
+#    docker compose --profile infra --profile platform --profile backend --profile frontend up -d
+#
+#  STARTUP ORDER (automatic via depends_on healthchecks):
+#    mongodb + redis → eureka-server → config-server → api-gateway → auth-service
+#    Teammates' services depend on api-gateway being healthy.
+# ════════════════════════════════════════════════════════════════════════════
+
+services:
+
+  # ── Infrastructure ─────────────────────────────────────────────────────────
+
+  mongodb:
+    image: mongo:7
+    container_name: novacart-mongo
+    profiles: [infra]
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: novacart_root
+      MONGO_INITDB_ROOT_PASSWORD: novacart_root_pw
+    volumes:
+      - mongo_data:/data/db
+      - ./docker/mongo/init-databases.js:/docker-entrypoint-initdb.d/init-databases.js:ro
+    networks:
+      - novacart-net
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: novacart-redis
+    profiles: [infra]
+    ports:
+      - "6379:6379"
+    networks:
+      - novacart-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: novacart-zookeeper
+    profiles: [infra]
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - novacart-net
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: novacart-kafka
+    profiles: [infra]
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    networks:
+      - novacart-net
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "kafka:29092", "--list"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: novacart-kafka-ui
+    profiles: [infra]
+    ports:
+      - "8099:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: novacart-cluster
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+    depends_on:
+      - kafka
+    networks:
+      - novacart-net
+
+  # PostgreSQL — for Member 3's services (Inventory, Order, Payment, Notification)
+  postgres:
+    image: postgres:16-alpine
+    container_name: novacart-postgres
+    profiles: [infra]
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: novacart
+      POSTGRES_PASSWORD: novacart_password
+      POSTGRES_DB: novacart_main
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh:ro
+    networks:
+      - novacart-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U novacart -d novacart_main"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Member 1 — Platform & Identity ─────────────────────────────────────────
+
+  eureka-server:
+    build:
+      context: .
+      dockerfile: infra/eureka-server/Dockerfile
+    image: novacart/eureka-server:local
+    container_name: novacart-eureka
+    profiles: [platform]
+    ports:
+      - "8761:8761"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - novacart-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8761/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 15s
+      timeout: 10s
+      retries: 8
+
+  config-server:
+    build:
+      context: .
+      dockerfile: infra/config-server/Dockerfile
+    image: novacart/config-server:local
+    container_name: novacart-config
+    profiles: [platform]
+    ports:
+      - "8888:8888"
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+    networks:
+      - novacart-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8888/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 15s
+      timeout: 10s
+      retries: 8
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: infra/api-gateway/Dockerfile
+    image: novacart/api-gateway:local
+    container_name: novacart-gateway
+    profiles: [platform]
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_CONFIG_IMPORT: "configserver:http://config-server:8888"
+      JWT_PUBLIC_KEY_PATH: /run/secrets/jwt_public_key
+    secrets:
+      - jwt_public_key
+    depends_on:
+      config-server:
+        condition: service_healthy
+    networks:
+      - novacart-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 15s
+      timeout: 10s
+      retries: 8
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: services/auth-service/Dockerfile
+    image: novacart/auth-service:local
+    container_name: novacart-auth
+    profiles: [platform]
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_CONFIG_IMPORT: "configserver:http://config-server:8888"
+      SPRING_DATA_MONGODB_URI: "mongodb://auth_svc:auth_svc_pw@mongodb:27017/auth_db"
+      SPRING_REDIS_HOST: redis
+      JWT_PRIVATE_KEY_PATH: /run/secrets/jwt_private_key
+      JWT_PUBLIC_KEY_PATH:  /run/secrets/jwt_public_key
+    secrets:
+      - jwt_private_key
+      - jwt_public_key
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - novacart-net
+
+  # ── Member 2 — Catalog & Discovery (stubs — fill in your Dockerfile) ────────
+
+  product-service:
+    image: novacart/product-service:local   # build this after adding your Dockerfile
+    container_name: novacart-product
+    profiles: [backend]                     # won't start unless --profile backend is passed
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_CONFIG_IMPORT: "configserver:http://config-server:8888"
+      SPRING_DATA_MONGODB_URI: "mongodb://product_svc:product_svc_pw@mongodb:27017/product_db"
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    networks:
+      - novacart-net
+
+  cart-service:
+    image: novacart/cart-service:local
+    container_name: novacart-cart
+    profiles: [backend]
+    ports:
+      - "8084:8084"
+    environment:
+      SPRING_CONFIG_IMPORT: "configserver:http://config-server:8888"
+      SPRING_REDIS_HOST: redis
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - novacart-net
+
+  # ── Member 3 — Transactions & Saga (stubs) ──────────────────────────────────
+
+  inventory-service:
+    image: novacart/inventory-service:local
+    container_name: novacart-inventory
+    profiles: [backend]
+    ports:
+      - "8083:8083"
+    environment:
+      SPRING_CONFIG_IMPORT: "configserver:http://config-server:8888"
+      SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/inventory_db"
+      SPRING_DATASOURCE_USERNAME: novacart
+      SPRING_DATASOURCE_PASSWORD: novacart_password
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - novacart-net
+
+  order-service:
+    image: novacart/order-service:local
+    container_name: novacart-order
+    profiles: [backend]
+    ports:
+      - "8085:8085"
+    environment:
+      SPRING_CONFIG_IMPORT: "configserver:http://config-server:8888"
+      SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/order_db"
+      SPRING_DATASOURCE_USERNAME: novacart
+      SPRING_DATASOURCE_PASSWORD: novacart_password
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - novacart-net
+
+  payment-service:
+    image: novacart/payment-service:local
+    container_name: novacart-payment
+    profiles: [backend]
+    ports:
+      - "8086:8086"
+    environment:
+      SPRING_CONFIG_IMPORT: "configserver:http://config-server:8888"
+      SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/payment_db"
+      SPRING_DATASOURCE_USERNAME: novacart
+      SPRING_DATASOURCE_PASSWORD: novacart_password
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - novacart-net
+
+  notification-service:
+    image: novacart/notification-service:local
+    container_name: novacart-notification
+    profiles: [backend]
+    ports:
+      - "8087:8087"
+    environment:
+      SPRING_CONFIG_IMPORT: "configserver:http://config-server:8888"
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - novacart-net
+
+  # ── Member 4 — AI & Ops (stub) ───────────────────────────────────────────────
+
+  ai-assistant-service:
+    image: novacart/ai-assistant-service:local
+    container_name: novacart-ai
+    profiles: [backend]
+    ports:
+      - "8089:8089"
+    environment:
+      SPRING_CONFIG_IMPORT: "configserver:http://config-server:8888"
+      SPRING_DATA_MONGODB_URI: "mongodb://ai_svc:ai_svc_pw@mongodb:27017/ai_db"
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    networks:
+      - novacart-net
+
+  # ── Frontend ─────────────────────────────────────────────────────────────────
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/novacart-web/Dockerfile
+    image: novacart/frontend:local
+    container_name: novacart-frontend
+    profiles: [frontend]
+    ports:
+      - "3000:80"
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    networks:
+      - novacart-net
+
+# ── Docker secrets (mount your generated key files) ──────────────────────────
+secrets:
+  jwt_private_key:
+    file: ./keys/jwt-private-key.pem
+  jwt_public_key:
+    file: ./keys/jwt-public-key.pem
+
+# ── Named volumes ─────────────────────────────────────────────────────────────
+volumes:
+  mongo_data:
+  postgres_data:
+
+# ── Network ───────────────────────────────────────────────────────────────────
+networks:
+  novacart-net:
+    driver: bridge

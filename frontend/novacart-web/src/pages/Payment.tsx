@@ -1,6 +1,8 @@
-import { PageSkeleton } from '../components/ui/Skeleton'
+import React from 'react';
+import { Navigate } from 'react-router-dom';
 
-// Owned by Member 3 (Transactions & Saga) — see TEAM.md
-export function PaymentPage() {
-  return <PageSkeleton title="Payment" />
-}
+export const PaymentPage: React.FC = () => {
+  // Payment is handled directly inside Checkout and OrderTracking pages via RazorpayWidget.
+  // Redirecting to orders.
+  return <Navigate to="/orders" replace />;
+};
