@@ -1,5 +1,7 @@
 export interface StoreProduct {
   id: string
+  /** Auth-service user ID that owns this listing. Undefined only for bundled demo seed data. */
+  sellerId?: string
   title: string
   brand: string
   brandLogo?: string

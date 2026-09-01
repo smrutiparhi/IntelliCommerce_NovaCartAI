@@ -63,7 +63,7 @@ export function CheckoutPage() {
         userId: user?.id ?? '',
         shippingAddressJson: serializeAddress(values),
         idempotencyKey: requestKey,
-        items: items.map(({ product, quantity }) => ({ productId: product.id, productName: product.title, productImage: product.image, sellerId: 'novacart-seed', unitPricePaise: product.priceINR * 100, quantity })),
+        items: items.map(({ product, quantity }) => ({ productId: product.id, productName: product.title, productImage: product.image, sellerId: product.sellerId ?? 'novacart-seed', unitPricePaise: product.priceINR * 100, quantity })),
       })
       setActiveOrder(order)
       navigate('/payment')

@@ -13,6 +13,7 @@ describe('mapApiProduct', () => {
     const product = mapApiProduct(source)
 
     expect(product.id).toBe('nova-watch')
+    expect(product.sellerId).toBe('seller-1')
     expect(product.priceINR).toBe(1999)
     expect(product.originalPriceINR).toBe(2499)
     expect(product.category).toBe('Accessories')

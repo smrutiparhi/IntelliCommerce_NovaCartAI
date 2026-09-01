@@ -3,7 +3,9 @@ import { ArrowLeft, ArrowRight, Check, ChevronDown, Heart, Minus, Plus, RotateCc
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useCommerceStore } from '../stores/commerce-store'
-import { useCatalogue, useProduct } from '../hooks/useCatalogue'
+import { useCatalogue, useProduct, useProductInventory } from '../hooks/useCatalogue'
+import { ReviewPanel } from '../components/product/ReviewPanel'
+import { replaceBrokenProductImage } from '../lib/product-image'
 
 const details = ['Overview', 'Specifications', 'Shipping & returns', 'Reviews']
 const imageViews = [
@@ -15,6 +17,7 @@ const imageViews = [
 export function ProductDetailsPage() {
   const { id } = useParams()
   const { data: productResult, isLoading } = useProduct(id)
+  const { data: inventory } = useProductInventory(id)
   const { data: catalogue } = useCatalogue()
   const product = productResult?.product
   const [quantity, setQuantity] = useState(1)
@@ -30,7 +33,7 @@ export function ProductDetailsPage() {
     if (detail === 'Overview') return product.description
     if (detail === 'Specifications') return `Key details: ${product.tags.join(' · ')}.`
     if (detail === 'Shipping & returns') return `${product.delivery ?? 'Delivery calculated at checkout'}. Easy returns within 7 days in the original condition.`
-    return `Rated ${product.rating} out of 5 from ${product.reviewsCount} verified catalogue ratings.`
+    return `Rated ${product.rating} out of 5 from ${product.reviewsCount} customer ratings.`
   }
 
   if (isLoading) return <div className="min-h-[70vh] bg-[var(--nc-bg)] px-5 py-16 text-[var(--nc-text)]"><div className="nc-shell grid animate-pulse gap-10 lg:grid-cols-2"><div className="aspect-square rounded-[2.5rem] bg-black/[.06] dark:bg-white/[.05]" /><div className="space-y-5 pt-8"><div className="h-3 w-28 rounded-full bg-black/10 dark:bg-white/10" /><div className="h-20 max-w-lg rounded-2xl bg-black/[.06] dark:bg-white/[.05]" /><div className="h-12 w-48 rounded-2xl bg-black/[.06] dark:bg-white/[.05]" /></div></div></div>
@@ -38,6 +41,7 @@ export function ProductDetailsPage() {
 
   const discount = product.originalPriceINR ? Math.round((1 - product.priceINR / product.originalPriceINR) * 100) : 0
   const related = (catalogue?.products ?? []).filter((item) => item.category === product.category && item.id !== product.id).slice(0, 3)
+  const stock = inventory ? Math.max(0, inventory.availableQuantity - inventory.reservedQuantity) : undefined
 
   return (
     <main className="min-h-screen bg-[var(--nc-bg)] py-8 text-[var(--nc-text)] lg:py-12">
@@ -48,7 +52,7 @@ export function ProductDetailsPage() {
           <section>
             <div className="group relative aspect-square overflow-hidden rounded-[2.5rem] border border-black/10 bg-[var(--nc-surface)] shadow-[0_24px_80px_rgba(34,30,22,.08)] dark:border-white/10 dark:shadow-float">
               <AnimatePresence mode="wait">
-                <motion.img key={activeImage} src={product.image} alt={product.title} initial={{ opacity: 0, scale: .98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={{ duration: .3 }} className={`h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.025] ${imageViews[activeImage].scale}`} style={{ objectPosition: imageViews[activeImage].position }} />
+                <motion.img key={activeImage} src={product.image} alt={product.title} onError={(event) => replaceBrokenProductImage(event, product.title, product.brand)} initial={{ opacity: 0, scale: .98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={{ duration: .3 }} className={`h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.025] ${imageViews[activeImage].scale}`} style={{ objectPosition: imageViews[activeImage].position }} />
               </AnimatePresence>
               <div className="absolute inset-x-0 top-0 flex items-start justify-between p-5 sm:p-6">
                 <span className="rounded-full border border-white/20 bg-black/35 px-3 py-2 text-[10px] font-bold uppercase tracking-[.16em] text-white backdrop-blur-xl">{product.brand}</span>
@@ -61,9 +65,9 @@ export function ProductDetailsPage() {
           <section className="lg:sticky lg:top-28 lg:h-fit">
             <p className="nc-label">{product.category} / {product.brand}</p>
             <h1 className="mt-5 text-h2">{product.title}</h1>
-            <div className="mt-5 flex flex-wrap items-center gap-3 text-sm"><span className="inline-flex items-center gap-1.5 rounded-full bg-violet-100 px-3 py-1.5 font-bold text-violet-800 dark:bg-[#dfff36]/10 dark:text-[#dfff36]"><Star className="h-3.5 w-3.5 fill-current" />{product.rating}</span><span className="text-slate-500">{product.reviewsCount} verified reviews</span></div>
+            <div className="mt-5 flex flex-wrap items-center gap-3 text-sm"><span className="inline-flex items-center gap-1.5 rounded-full bg-violet-100 px-3 py-1.5 font-bold text-violet-800 dark:bg-[#dfff36]/10 dark:text-[#dfff36]"><Star className="h-3.5 w-3.5 fill-current" />{product.rating}</span><span className="text-slate-500">{product.reviewsCount} customer reviews</span></div>
             <div className="mt-8 flex flex-wrap items-baseline gap-3"><p className="text-3xl font-semibold tracking-[-.04em]">₹{product.priceINR.toLocaleString('en-IN')}</p>{product.originalPriceINR && <><p className="text-sm text-slate-500 line-through">₹{product.originalPriceINR.toLocaleString('en-IN')}</p><p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">Save ₹{(product.originalPriceINR - product.priceINR).toLocaleString('en-IN')}</p></>}</div>
-            <p className="mt-2 text-xs text-slate-500">Inclusive of all taxes</p>
+            <div className="mt-3 flex flex-wrap items-center gap-2"><p className="text-xs text-slate-500">Inclusive of all taxes</p>{stock !== undefined && <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${stock === 0 ? 'bg-rose-100 text-rose-700 dark:bg-rose-400/10 dark:text-rose-300' : stock <= 5 ? 'bg-amber-100 text-amber-700 dark:bg-amber-400/10 dark:text-amber-300' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300'}`}>{stock === 0 ? 'Sold out' : stock <= 5 ? `Only ${stock} remaining` : `${stock} in stock`}</span>}</div>
             <p className="mt-7 text-sm leading-7 text-slate-600 dark:text-slate-400">{product.description}</p>
 
             <div className="mt-8 grid gap-3 sm:grid-cols-3">
@@ -78,6 +82,8 @@ export function ProductDetailsPage() {
             <div className="mt-8 divide-y divide-black/10 border-y border-black/10 dark:divide-white/10 dark:border-white/10">{details.map((detail) => <div key={detail}><button onClick={() => setOpenDetail(openDetail === detail ? '' : detail)} aria-expanded={openDetail === detail} className="flex w-full items-center justify-between py-5 text-left text-sm font-semibold"><span>{detail}</span><ChevronDown className={`h-4 w-4 text-slate-500 transition ${openDetail === detail ? 'rotate-180' : ''}`} /></button><AnimatePresence initial={false}>{openDetail === detail && <motion.p initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden pb-5 text-sm leading-7 text-slate-500">{detailCopy(detail)}</motion.p>}</AnimatePresence></div>)}</div>
           </section>
         </div>
+
+        <ReviewPanel productId={product.id} />
 
         {related.length > 0 && <section className="border-t border-black/10 py-20 dark:border-white/10 lg:py-24"><div className="flex items-end justify-between gap-6"><div><p className="nc-label">More in {product.category}</p><h2 className="mt-4 text-h2">You may also like.</h2></div><Link to={`/search?q=${product.category}`} className="hidden items-center gap-2 text-xs font-bold text-slate-500 hover:text-slate-950 dark:hover:text-white sm:flex">View collection <ArrowRight className="h-4 w-4" /></Link></div><div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">{related.map((item) => <Link key={item.id} to={`/products/${item.id}`} className="group overflow-hidden rounded-[1.7rem] border border-black/10 bg-[var(--nc-surface)] p-2 transition hover:-translate-y-1 hover:shadow-xl dark:border-white/10"><div className="aspect-[4/3] overflow-hidden rounded-[1.3rem]"><img src={item.image} alt={item.title} className="h-full w-full object-cover transition duration-700 group-hover:scale-105" /></div><div className="flex items-end justify-between gap-4 p-4"><div><p className="text-[10px] font-bold uppercase tracking-wider text-violet-600 dark:text-[#dfff36]">{item.brand}</p><h3 className="mt-2 text-sm font-semibold">{item.title}</h3></div><p className="shrink-0 text-sm font-bold">₹{item.priceINR.toLocaleString('en-IN')}</p></div></Link>)}</div></section>}
       </div>

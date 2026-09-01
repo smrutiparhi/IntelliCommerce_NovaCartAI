@@ -5,9 +5,10 @@ import { Eye, Heart, ShoppingBag, Star, Sparkles } from 'lucide-react'
 import type { StoreProduct } from '../../data/store-products'
 import { useAIStore } from '../../stores/ai-store'
 import { useCommerceStore } from '../../stores/commerce-store'
+import { replaceBrokenProductImage } from '../../lib/product-image'
 import { QuickViewModal } from '../product/QuickViewModal'
 import { BrandFilterBar } from './BrandFilterBar'
-import { useCatalogue } from '../../hooks/useCatalogue'
+import { useAvailability, useCatalogue } from '../../hooks/useCatalogue'
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -32,6 +33,7 @@ const cardVariants = {
 export function ProductCardGrid({ query }: { query?: string } = {}) {
   const { searchQuery, selectedBrand } = useAIStore()
   const { data: catalogue, isLoading } = useCatalogue()
+  const { data: availability } = useAvailability()
   const products = catalogue?.products ?? []
   const effectiveQuery = query ?? searchQuery
   const effectiveBrand = query === undefined ? selectedBrand : null
@@ -78,7 +80,7 @@ export function ProductCardGrid({ query }: { query?: string } = {}) {
       >
         <AnimatePresence mode="popLayout">
           {filteredProducts.map((product) => (
-            <ProductCard key={product.id} product={product} />
+            <ProductCard key={product.id} product={product} stock={availability?.[product.id]} />
           ))}
         </AnimatePresence>
       </motion.div>
@@ -96,7 +98,7 @@ export function ProductCardGrid({ query }: { query?: string } = {}) {
   )
 }
 
-function ProductCard({ product }: { product: StoreProduct }) {
+function ProductCard({ product, stock }: { product: StoreProduct; stock?: number }) {
   const [quickViewOpen, setQuickViewOpen] = useState(false)
   const isSaved = useCommerceStore((state) => state.wishlist.includes(product.id))
   const cartQuantity = useCommerceStore((state) => state.cart[product.id] ?? 0)
@@ -117,10 +119,7 @@ function ProductCard({ product }: { product: StoreProduct }) {
           src={product.image}
           alt={product.title}
           loading="lazy"
-          onError={(event) => {
-            event.currentTarget.src = '/favicon.svg'
-            event.currentTarget.classList.add('object-contain', 'p-16')
-          }}
+          onError={(event) => replaceBrokenProductImage(event, product.title, product.brand)}
           className="h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
         />
 
@@ -147,11 +146,12 @@ function ProductCard({ product }: { product: StoreProduct }) {
           <button type="button" onClick={() => setQuickViewOpen(true)} className="grid h-10 w-10 place-items-center rounded-full bg-white text-slate-950 shadow-md" aria-label={`Quick view ${product.title}`}><Eye className="h-4 w-4" /></button>
           <button
             type="button"
-            onClick={() => addToCart(product.id)}
+            onClick={() => stock !== 0 && addToCart(product.id)}
+            disabled={stock === 0}
             aria-label={`Add ${product.title} to cart`}
-            className="flex flex-1 items-center justify-center gap-2 rounded-full bg-slate-950/95 py-2.5 text-xs font-bold text-white backdrop-blur transition-colors hover:bg-indigo-500 shadow-md"
+            className="flex flex-1 items-center justify-center gap-2 rounded-full bg-slate-950/95 py-2.5 text-xs font-bold text-white backdrop-blur transition-colors hover:bg-indigo-500 disabled:cursor-not-allowed disabled:bg-slate-500 shadow-md"
           >
-            <ShoppingBag className="h-3.5 w-3.5" /> {cartQuantity > 0 ? `${cartQuantity} in cart` : 'Quick add'}
+            <ShoppingBag className="h-3.5 w-3.5" /> {stock === 0 ? 'Sold out' : cartQuantity > 0 ? `${cartQuantity} in cart` : 'Quick add'}
           </button>
         </div>
       </div>
@@ -174,6 +174,7 @@ function ProductCard({ product }: { product: StoreProduct }) {
         {/* Price */}
         <div className="mt-3 border-t border-slate-100 pt-2.5 dark:border-dark-border/60">
           <div className="flex items-baseline gap-2"><span className="text-body font-bold text-slate-900 dark:text-white">₹{product.priceINR.toLocaleString('en-IN')}</span>{product.originalPriceINR && <span className="text-xs text-slate-500 line-through">₹{product.originalPriceINR.toLocaleString('en-IN')}</span>}</div>
+          {stock !== undefined && <p className={`mt-1 text-[10px] font-bold ${stock === 0 ? 'text-rose-500' : stock <= 5 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>{stock === 0 ? 'Currently sold out' : stock <= 5 ? `Only ${stock} left` : 'In stock'}</p>}
           {product.delivery && <p className="mt-1 text-[10px] text-slate-500">{product.delivery}</p>}
         </div>
       </div>

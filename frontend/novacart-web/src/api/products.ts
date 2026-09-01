@@ -1,5 +1,6 @@
 import { apiClient } from '../lib/api-client'
 import { PRODUCTS, type StoreProduct } from '../data/store-products'
+import { productImageFallback } from '../lib/product-image'
 
 export interface ProductApiModel {
   id: string
@@ -48,6 +49,28 @@ export interface ProductWritePayload {
   active: boolean
 }
 
+export interface ProductReview {
+  id: string
+  productId: string
+  userId: string
+  customerName: string
+  rating: number
+  title: string
+  comment: string
+  verifiedPurchase: boolean
+  updatedAt: string
+}
+
+export interface ReviewWritePayload { rating: number; title: string; comment: string }
+
+export async function getProductReviews(idOrSlug: string): Promise<ProductReview[]> {
+  return (await apiClient.get<ProductReview[]>(`/products/${encodeURIComponent(idOrSlug)}/reviews`)).data
+}
+
+export async function saveProductReview(idOrSlug: string, payload: ReviewWritePayload): Promise<ProductReview> {
+  return (await apiClient.post<ProductReview>(`/products/${encodeURIComponent(idOrSlug)}/reviews`, payload)).data
+}
+
 async function fetchAllProducts(): Promise<{ products: ProductApiModel[]; total: number }> {
   const first = (await apiClient.get<SpringPage<ProductApiModel>>('/products', { params: { page: 0, size: 100, sort: 'newest' } })).data
   const remaining = first.totalPages > 1
@@ -58,6 +81,11 @@ async function fetchAllProducts(): Promise<{ products: ProductApiModel[]; total:
 
 export async function getRawCatalogue(): Promise<ProductApiModel[]> {
   return (await fetchAllProducts()).products
+}
+
+export async function getSellerProducts(): Promise<ProductApiModel[]> {
+  const response = await apiClient.get<ProductApiModel[]>('/products/seller/me')
+  return response.data
 }
 
 export async function createProduct(payload: ProductWritePayload): Promise<ProductApiModel> {
@@ -79,13 +107,14 @@ const titleCase = (value: string) => value.replace(/-/g, ' ').replace(/\b\w/g, (
 export function mapApiProduct(product: ProductApiModel): StoreProduct {
   return {
     id: product.slug,
+    sellerId: product.sellerId,
     title: product.title,
     brand: product.brand,
     priceINR: Math.round(product.priceInPaise / 100),
     originalPriceINR: product.originalPriceInPaise ? Math.round(product.originalPriceInPaise / 100) : undefined,
     rating: product.rating,
     reviewsCount: product.reviewCount.toLocaleString('en-IN'),
-    image: product.images[0] ?? '/favicon.svg',
+    image: product.images[0] || productImageFallback(product.title, product.brand),
     category: titleCase(product.categorySlug),
     tags: product.tags ?? [],
     badge: product.badge ?? undefined,

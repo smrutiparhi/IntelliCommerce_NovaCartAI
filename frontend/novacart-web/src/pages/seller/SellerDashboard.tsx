@@ -3,10 +3,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Boxes, CheckCircle2, Edit3, IndianRupee, LoaderCircle, Package, Plus, ShoppingBag, Trash2, X } from 'lucide-react'
 import { type FormEvent, useMemo, useState } from 'react'
 import { Navigate } from 'react-router-dom'
-import { createProduct, deleteProduct, getRawCatalogue, updateProduct, type ProductApiModel, type ProductWritePayload } from '../../api/products'
+import { createProduct, deleteProduct, getSellerProducts, updateProduct, type ProductApiModel, type ProductWritePayload } from '../../api/products'
 import { getInventory, setInventory } from '../../api/inventory'
 import { getSellerOrders } from '../../api/orders'
 import { useAuthStore } from '../../stores/auth-store'
+import { SellerOrdersPanel } from '../../components/seller/SellerOrdersPanel'
 
 const categories = ['technology', 'audio', 'fashion', 'home', 'appliances', 'beauty', 'sports', 'books', 'grocery', 'toys', 'accessories']
 const emptyForm = { title: '', brand: '', categorySlug: 'technology', price: '', originalPrice: '', description: '', image: '', tags: '', badge: '', delivery: 'Free delivery in 2 days', stock: '25' }
@@ -21,10 +22,10 @@ export function SellerDashboardPage() {
   const [editing, setEditing] = useState<ProductApiModel | null>(null)
   const [form, setForm] = useState<ProductForm>(emptyForm)
   const [notice, setNotice] = useState('')
-  const catalogue = useQuery({ queryKey: ['seller-products'], queryFn: getRawCatalogue, enabled: Boolean(user) })
+  const catalogue = useQuery({ queryKey: ['seller-products'], queryFn: getSellerProducts, enabled: Boolean(user) })
   const inventory = useQuery({ queryKey: ['seller-inventory'], queryFn: getInventory, enabled: Boolean(user) })
   const orders = useQuery({ queryKey: ['seller-orders'], queryFn: () => getSellerOrders(0, 50), enabled: Boolean(user?.roles.includes('ROLE_SELLER')) })
-  const products = useMemo(() => (catalogue.data ?? []).filter((product) => product.sellerId === user?.id), [catalogue.data, user?.id])
+  const products = catalogue.data ?? []
   const stockByProduct = useMemo(() => new Map((inventory.data ?? []).map((stock) => [stock.productId, stock])), [inventory.data])
   const revenue = (orders.data?.content ?? []).filter((order) => ['CONFIRMED', 'SHIPPED', 'DELIVERED'].includes(order.status)).reduce((sum, order) => sum + order.items.filter((item) => item.sellerId === user?.id).reduce((itemSum, item) => itemSum + item.subtotalPaise, 0), 0)
 
@@ -33,12 +34,12 @@ export function SellerDashboardPage() {
       if (!user) throw new Error('Seller session required')
       const payload: ProductWritePayload = { title: form.title.trim(), brand: form.brand.trim(), categorySlug: form.categorySlug, priceInPaise: Math.round(Number(form.price) * 100), originalPriceInPaise: form.originalPrice ? Math.round(Number(form.originalPrice) * 100) : null, description: form.description.trim(), images: [form.image.trim()], tags: form.tags.split(',').map((tag) => tag.trim()).filter(Boolean), badge: form.badge.trim() || undefined, delivery: form.delivery.trim() || undefined, active: true }
       const product = editing ? await updateProduct(editing.id, payload) : await createProduct(payload)
-      await setInventory(product.slug, Math.max(0, Number(form.stock) || 0), user.id)
+      await setInventory(product.slug, Math.max(0, Number(form.stock) || 0))
     },
     onSuccess: async () => { await Promise.all([queryClient.invalidateQueries({ queryKey: ['seller-products'] }), queryClient.invalidateQueries({ queryKey: ['seller-inventory'] }), queryClient.invalidateQueries({ queryKey: ['catalogue'] })]); setEditorOpen(false); setNotice(editing ? 'Product updated successfully.' : 'Product published successfully.') },
   })
   const remove = useMutation({ mutationFn: deleteProduct, onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ['seller-products'] }); setNotice('Product removed from the storefront.') } })
-  const stockUpdate = useMutation({ mutationFn: ({ productId, quantity }: { productId: string; quantity: number }) => setInventory(productId, quantity, user?.id), onSuccess: () => queryClient.invalidateQueries({ queryKey: ['seller-inventory'] }) })
+  const stockUpdate = useMutation({ mutationFn: ({ productId, quantity }: { productId: string; quantity: number }) => setInventory(productId, quantity), onSuccess: () => queryClient.invalidateQueries({ queryKey: ['seller-inventory'] }) })
 
   if (!user?.roles.includes('ROLE_SELLER') && !user?.roles.includes('ROLE_ADMIN')) return <Navigate to="/home" replace />
   const openCreate = () => { setEditing(null); setForm(emptyForm); setEditorOpen(true); setNotice('') }
@@ -47,6 +48,7 @@ export function SellerDashboardPage() {
 
   return <main className="min-h-[75vh] bg-[var(--nc-bg)] px-5 py-10 text-[var(--nc-text)] sm:px-8 lg:py-14"><div className="mx-auto max-w-shell">
     <section className="relative overflow-hidden rounded-[2.25rem] bg-slate-950 px-6 py-8 text-white sm:px-9 sm:py-10"><div className="absolute -right-20 -top-24 h-72 w-72 rounded-full bg-violet-600/25 blur-3xl" /><div className="relative flex flex-col justify-between gap-7 lg:flex-row lg:items-end"><div><p className="text-xs font-black uppercase tracking-[.18em] text-[#dfff36]">Seller studio</p><h1 className="mt-3 text-4xl font-black tracking-[-.055em] sm:text-5xl">Your store, in motion.</h1><p className="mt-4 max-w-xl text-sm leading-6 text-slate-400">Publish products, manage live inventory, and follow every order from one focused workspace.</p></div><button onClick={openCreate} className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-[#dfff36] px-6 text-sm font-black text-slate-950 transition hover:-translate-y-0.5"><Plus className="h-4 w-4" /> Add product</button></div></section>
+    <SellerOrdersPanel orders={orders.data?.content ?? []} sellerId={user.id} loading={orders.isLoading} />
     {notice && <div className="mt-5 flex items-center gap-2 rounded-2xl border border-emerald-300/40 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-400/[.07] dark:text-emerald-300"><CheckCircle2 className="h-4 w-4" />{notice}</div>}
     <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{[
       { label: 'Live products', value: products.length, icon: Package },

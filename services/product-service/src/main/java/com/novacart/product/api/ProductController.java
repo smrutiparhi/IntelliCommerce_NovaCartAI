@@ -8,6 +8,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import java.util.List;
+import com.novacart.product.api.dto.ReviewRequest;
+import com.novacart.product.api.dto.ReviewResponse;
 
 @RestController
 @RequestMapping("/api/v1/products")
@@ -24,6 +27,19 @@ public class ProductController {
     }
 
     @GetMapping("/{idOrSlug}") public ProductResponse get(@PathVariable String idOrSlug) { return catalog.get(idOrSlug); }
+
+    @GetMapping("/{idOrSlug}/reviews") public List<ReviewResponse> reviews(@PathVariable String idOrSlug) { return catalog.reviews(idOrSlug); }
+    @PostMapping("/{idOrSlug}/reviews")
+    public ReviewResponse review(@PathVariable String idOrSlug, @Valid @RequestBody ReviewRequest request,
+        @RequestHeader("X-User-Id") String userId, @RequestHeader(value="X-User-Name", required=false) String name) {
+        return catalog.review(idOrSlug, request, userId, name);
+    }
+
+    @GetMapping("/seller/me")
+    public List<ProductResponse> sellerProducts(@RequestHeader("X-User-Id") String userId,
+        @RequestHeader(value = "X-User-Roles", required = false) String roles) {
+        requireSeller(roles); return catalog.sellerProducts(userId);
+    }
 
     @PostMapping
     public ResponseEntity<ProductResponse> create(@Valid @RequestBody ProductRequest request,

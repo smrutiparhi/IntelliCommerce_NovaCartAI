@@ -13,6 +13,7 @@ import org.springframework.core.Ordered;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.reactive.ServerHttpRequest;
@@ -66,7 +67,7 @@ public class JwtValidationFilter implements GlobalFilter, Ordered {
         ServerHttpRequest request = exchange.getRequest();
         String path = request.getURI().getPath();
 
-        if (PUBLIC_PATHS.contains(path)) {
+        if (PUBLIC_PATHS.contains(path) || isPublicCatalogueRead(request.getMethod(), path)) {
             return chain.filter(exchange);
         }
 
@@ -106,6 +107,14 @@ public class JwtValidationFilter implements GlobalFilter, Ordered {
     @Override
     public int getOrder() {
         return Ordered.HIGHEST_PRECEDENCE + 1; // after TraceIdFilter, before routing
+    }
+
+    private boolean isPublicCatalogueRead(HttpMethod method, String path) {
+        if (!HttpMethod.GET.equals(method)) return false;
+        boolean publicProductPath = (path.equals("/api/v1/products") || path.startsWith("/api/v1/products/"))
+            && !path.equals("/api/v1/products/seller") && !path.startsWith("/api/v1/products/seller/");
+        boolean publicInventoryPath = path.equals("/api/v1/inventory/availability") || path.startsWith("/api/v1/inventory/product/");
+        return publicProductPath || publicInventoryPath || path.equals("/api/v1/categories") || path.startsWith("/api/v1/categories/");
     }
 
     private Mono<Void> unauthorized(ServerWebExchange exchange, String message) {
