@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CreditCard, ShieldCheck, AlertCircle, CheckCircle2, Lock } from 'lucide-react';
+import { CreditCard, ShieldCheck, CheckCircle2, Lock } from 'lucide-react';
 import { Order } from '../types/saga';
 
 interface RazorpayWidgetProps {
@@ -15,7 +15,7 @@ export const RazorpayWidget: React.FC<RazorpayWidgetProps> = ({
 }) => {
   const [loading, setLoading] = useState(false);
 
-  const handleSimulatedPayment = async (shouldFail: boolean) => {
+  const handlePayment = async () => {
     setLoading(true);
     try {
       const response = await fetch('/api/v1/payments/process', {
@@ -25,7 +25,7 @@ export const RazorpayWidget: React.FC<RazorpayWidgetProps> = ({
           orderId: order.id,
           userId: order.userId,
           amountPaise: order.totalPaise,
-          shouldFail: shouldFail
+          shouldFail: false
         })
       });
 
@@ -37,7 +37,7 @@ export const RazorpayWidget: React.FC<RazorpayWidgetProps> = ({
       } else {
         onPaymentFailure(data.failureReason || 'Payment Declined by Razorpay');
       }
-    } catch (err: any) {
+    } catch {
       setLoading(false);
       onPaymentFailure('Network connection error');
     }
@@ -77,7 +77,7 @@ export const RazorpayWidget: React.FC<RazorpayWidgetProps> = ({
 
       <div className="space-y-3">
         <button
-          onClick={() => handleSimulatedPayment(false)}
+          onClick={handlePayment}
           disabled={loading}
           className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white font-semibold flex items-center justify-center gap-2 shadow-lg shadow-sky-600/25 transition-all disabled:opacity-50"
         >
@@ -85,18 +85,11 @@ export const RazorpayWidget: React.FC<RazorpayWidgetProps> = ({
             <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
           ) : (
             <>
-              <CheckCircle2 className="w-5 h-5" /> Pay Now via Razorpay (Simulate Success)
+              <CheckCircle2 className="w-5 h-5" /> Pay securely
             </>
           )}
         </button>
 
-        <button
-          onClick={() => handleSimulatedPayment(true)}
-          disabled={loading}
-          className="w-full py-3 px-4 rounded-xl bg-slate-800/80 hover:bg-rose-950/40 text-rose-400 border border-rose-900/50 text-xs font-medium flex items-center justify-center gap-2 transition-all disabled:opacity-50"
-        >
-          <AlertCircle className="w-4 h-4" /> Simulate Payment Failure (Test Saga Compensation Path)
-        </button>
       </div>
 
       <div className="mt-4 text-[11px] text-slate-500 text-center flex items-center justify-center gap-1">

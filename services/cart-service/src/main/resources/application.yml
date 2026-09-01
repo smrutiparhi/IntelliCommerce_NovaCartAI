@@ -1,0 +1,18 @@
+server:
+  port: 8084
+
+spring:
+  application:
+    name: cart-service
+  config:
+    import: "${SPRING_CONFIG_IMPORT:optional:configserver:http://localhost:8888}"
+  data:
+    redis:
+      host: ${SPRING_REDIS_HOST:${REDIS_HOST:localhost}}
+      port: ${SPRING_REDIS_PORT:${REDIS_PORT:6379}}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

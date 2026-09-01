@@ -77,7 +77,8 @@ public class InventoryService {
         }
 
         StockReservedPayload stockReservedPayload = new StockReservedPayload(
-            payload.orderId(), reservationId, reservedItems, expiresAt
+            payload.orderId(), reservationId, reservedItems, expiresAt,
+            payload.userId(), payload.totalAmountPaise(), payload.currency()
         );
 
         saveOutboxEvent(payload.orderId(), "inventory.stock-reserved", stockReservedPayload);
@@ -88,12 +89,15 @@ public class InventoryService {
     public void confirmReservation(String orderId) {
         List<Reservation> reservations = reservationRepository.findByOrderId(orderId);
         for (Reservation reservation : reservations) {
-            if (reservation.getStatus() == ReservationStatus.ACTIVE) {
+            if (reservation.getStatus() == ReservationStatus.ACTIVE || reservation.getStatus() == ReservationStatus.CONFIRMED) {
+                boolean wasActive = reservation.getStatus() == ReservationStatus.ACTIVE;
                 reservation.setStatus(ReservationStatus.CONFIRMED);
                 reservationRepository.save(reservation);
 
                 inventoryRepository.findByProductId(reservation.getProductId()).ifPresent(inv -> {
-                    inv.setReservedQuantity(Math.max(0, inv.getReservedQuantity() - reservation.getQuantity()));
+                    if (wasActive) {
+                        inv.setReservedQuantity(Math.max(0, inv.getReservedQuantity() - reservation.getQuantity()));
+                    }
                     inventoryRepository.save(inv);
                 });
             }

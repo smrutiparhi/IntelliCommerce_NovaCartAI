@@ -161,7 +161,10 @@ public class OrderService {
         Order order = orderRepository.findById(orderId)
             .orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
 
-        if (order.getStatus() == OrderStatus.CONFIRMED || order.getStatus() == OrderStatus.CANCELLED) {
+        if (order.getStatus() == OrderStatus.CANCELLED) {
+            return order;
+        }
+        if (order.getStatus() == OrderStatus.SHIPPED || order.getStatus() == OrderStatus.DELIVERED) {
             log.warn("Cannot cancel order in state {}", order.getStatus());
             return order;
         }
@@ -181,8 +184,25 @@ public class OrderService {
         return orderRepository.findById(orderId);
     }
 
+    public Optional<Order> getOrderForUser(String orderId, String userId) {
+        return orderRepository.findById(orderId).filter(order -> order.getUserId().equals(userId));
+    }
+
+    @Transactional
+    public Order cancelOrderForUser(String orderId, String userId, String reason) {
+        Order order = orderRepository.findById(orderId)
+            .filter(candidate -> candidate.getUserId().equals(userId))
+            .orElseThrow(() -> new IllegalArgumentException("Order not found"));
+        return cancelOrder(order.getId(), reason);
+    }
+
     public Page<Order> getOrdersByUserId(String userId, Pageable pageable) {
         return orderRepository.findByUserIdOrderByCreatedAtDesc(userId, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<Order> getOrdersForSeller(String sellerId, Pageable pageable) {
+        return orderRepository.findDistinctByItemsSellerIdOrderByCreatedAtDesc(sellerId, pageable);
     }
 
     private void saveOutboxEvent(String aggregateId, String eventType, Object payload) {

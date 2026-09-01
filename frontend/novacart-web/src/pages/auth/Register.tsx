@@ -6,6 +6,7 @@ import { useMutation } from '@tanstack/react-query'
 import { AuthLayout } from './AuthLayout'
 import { FormField } from '../../components/ui/FormField'
 import { Input } from '../../components/ui/Input'
+import { PasswordInput } from '../../components/ui/PasswordInput'
 import { Button } from '../../components/ui/Button'
 import { register as registerUser } from '../../api/auth'
 import { useAuthStore } from '../../stores/auth-store'
@@ -49,7 +50,7 @@ export function RegisterPage() {
     mutationFn: registerUser,
     onSuccess: ({ user, accessToken }) => {
       setAuth(user, accessToken)
-      navigate('/', { replace: true })
+      navigate(user.roles.includes('ROLE_SELLER') ? '/seller' : '/home', { replace: true })
     },
     onError: (error) => {
       const message = isApiError(error) ? error.response?.data.error.message : 'Something went wrong. Please try again.'
@@ -91,13 +92,12 @@ export function RegisterPage() {
         </FormField>
 
         <FormField label="Password" htmlFor="password" error={errors.password?.message}>
-          <Input id="password" type="password" autoComplete="new-password" error={!!errors.password} {...register('password')} />
+          <PasswordInput id="password" autoComplete="new-password" error={!!errors.password} {...register('password')} />
         </FormField>
 
         <FormField label="Confirm password" htmlFor="confirmPassword" error={errors.confirmPassword?.message}>
-          <Input
+          <PasswordInput
             id="confirmPassword"
-            type="password"
             autoComplete="new-password"
             error={!!errors.confirmPassword}
             {...register('confirmPassword')}

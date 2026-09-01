@@ -5,7 +5,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import { AuthLayout } from './AuthLayout'
 import { FormField } from '../../components/ui/FormField'
-import { Input } from '../../components/ui/Input'
+import { PasswordInput } from '../../components/ui/PasswordInput'
 import { Button } from '../../components/ui/Button'
 import { resetPassword } from '../../api/auth'
 import { isApiError } from '../../lib/api-client'
@@ -57,13 +57,12 @@ export function ResetPasswordPage() {
     <AuthLayout title="Set a new password" subtitle="Choose a new password for your account">
       <form onSubmit={handleSubmit((data) => mutation.mutate(data))} className="flex flex-col gap-4" noValidate>
         <FormField label="New password" htmlFor="password" error={errors.password?.message}>
-          <Input id="password" type="password" autoComplete="new-password" error={!!errors.password} {...register('password')} />
+          <PasswordInput id="password" autoComplete="new-password" error={!!errors.password} {...register('password')} />
         </FormField>
 
         <FormField label="Confirm new password" htmlFor="confirmPassword" error={errors.confirmPassword?.message}>
-          <Input
+          <PasswordInput
             id="confirmPassword"
-            type="password"
             autoComplete="new-password"
             error={!!errors.confirmPassword}
             {...register('confirmPassword')}

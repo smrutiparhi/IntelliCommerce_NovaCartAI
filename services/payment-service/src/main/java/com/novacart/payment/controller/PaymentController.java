@@ -22,8 +22,10 @@ public class PaymentController {
     private final PaymentRepository paymentRepository;
 
     @PostMapping("/process")
-    public ResponseEntity<Payment> processPayment(@Valid @RequestBody ProcessPaymentRequest request) {
-        Payment processed = paymentService.processPayment(request);
+    public ResponseEntity<Payment> processPayment(
+            @RequestHeader("X-User-Id") String userId,
+            @Valid @RequestBody ProcessPaymentRequest request) {
+        Payment processed = paymentService.processPayment(request, userId);
         return ResponseEntity.ok(processed);
     }
 
@@ -55,8 +57,11 @@ public class PaymentController {
     }
 
     @GetMapping("/order/{orderId}")
-    public ResponseEntity<Payment> getPaymentByOrderId(@PathVariable String orderId) {
+    public ResponseEntity<Payment> getPaymentByOrderId(
+            @RequestHeader("X-User-Id") String userId,
+            @PathVariable String orderId) {
         return paymentRepository.findByOrderId(orderId)
+            .filter(payment -> payment.getUserId().equals(userId))
             .map(ResponseEntity::ok)
             .orElse(ResponseEntity.notFound().build());
     }

@@ -87,7 +87,7 @@ public class SagaIntegrationTest {
             "prod-1", "Laptop", "laptop.png", "seller-1", 5000000L, 1
         );
         CreateOrderRequest request = new CreateOrderRequest(
-            "user-1", "{}", "DISCOUNT10", UUID.randomUUID().toString(), List.of(item)
+            "user-1", List.of(item), "{}", "DISCOUNT10", UUID.randomUUID().toString()
         );
 
         Order createdOrder = orderService.createOrder(request);
@@ -101,7 +101,12 @@ public class SagaIntegrationTest {
         assertThat(record).isNotNull();
 
         // 3. Simulate Inventory Service Success Response
-        StockReservedPayload stockReservedPayload = new StockReservedPayload(createdOrder.getId(), createdOrder.getOrderNumber());
+        StockReservedPayload stockReservedPayload = new StockReservedPayload(
+            createdOrder.getId(),
+            "reservation-1",
+            List.of(new StockReservedPayload.ReservedItemPayload("prod-1", 1)),
+            java.time.Instant.now().plus(Duration.ofMinutes(15))
+        );
         EventEnvelope<StockReservedPayload> inventoryEvent = new EventEnvelope<>(
             UUID.randomUUID().toString(),
             "inventory.stock-reserved",
@@ -122,7 +127,15 @@ public class SagaIntegrationTest {
         });
 
         // 5. Simulate Payment Service Success Response
-        PaymentSuccessfulPayload paymentPayload = new PaymentSuccessfulPayload(createdOrder.getId(), "pay_mock123");
+        PaymentSuccessfulPayload paymentPayload = new PaymentSuccessfulPayload(
+            createdOrder.getId(),
+            "payment-1",
+            "order_mock123",
+            "pay_mock123",
+            5000000L,
+            "INR",
+            "card"
+        );
         EventEnvelope<PaymentSuccessfulPayload> paymentEvent = new EventEnvelope<>(
             UUID.randomUUID().toString(),
             "payment.successful",

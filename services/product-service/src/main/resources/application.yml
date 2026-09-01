@@ -1,0 +1,18 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: product-service
+  config:
+    import: "${SPRING_CONFIG_IMPORT:optional:configserver:http://localhost:8888}"
+  data:
+    mongodb:
+      uri: ${PRODUCT_DB_URI:${SPRING_DATA_MONGODB_URI:mongodb://localhost:27017/product_db}}
+      auto-index-creation: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

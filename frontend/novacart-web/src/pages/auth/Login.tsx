@@ -6,6 +6,7 @@ import { useMutation } from '@tanstack/react-query'
 import { AuthLayout } from './AuthLayout'
 import { FormField } from '../../components/ui/FormField'
 import { Input } from '../../components/ui/Input'
+import { PasswordInput } from '../../components/ui/PasswordInput'
 import { Button } from '../../components/ui/Button'
 import { login } from '../../api/auth'
 import { useAuthStore } from '../../stores/auth-store'
@@ -34,11 +35,13 @@ export function LoginPage() {
     mutationFn: login,
     onSuccess: ({ user, accessToken }) => {
       setAuth(user, accessToken)
-      const redirectTo = (location.state as { from?: Location })?.from?.pathname ?? '/'
+      const redirectTo = (location.state as { from?: Location })?.from?.pathname ?? (user.roles.includes('ROLE_SELLER') ? '/seller' : '/home')
       navigate(redirectTo, { replace: true })
     },
     onError: (error) => {
-      const message = isApiError(error) ? error.response?.data.error.message : 'Something went wrong. Please try again.'
+      const message = isApiError(error)
+        ? error.response?.data.error.message
+        : 'The sign-in service is unavailable. Start the backend services and try again.'
       setError('root', { message: message ?? 'Login failed' })
     },
   })
@@ -51,7 +54,7 @@ export function LoginPage() {
         </FormField>
 
         <FormField label="Password" htmlFor="password" error={errors.password?.message}>
-          <Input id="password" type="password" autoComplete="current-password" error={!!errors.password} {...register('password')} />
+          <PasswordInput id="password" autoComplete="current-password" error={!!errors.password} {...register('password')} />
         </FormField>
 
         <div className="flex justify-end">

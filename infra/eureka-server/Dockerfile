@@ -2,17 +2,9 @@
 FROM eclipse-temurin:21-jdk-alpine AS build
 WORKDIR /workspace
 
-# Copy Maven wrapper and root pom first (cache-friendly)
-COPY mvnw mvnw.cmd pom.xml ./
-COPY .mvn .mvn
-
-# Copy shared module
-COPY shared/novacart-common/pom.xml shared/novacart-common/pom.xml
-COPY shared/novacart-common/src     shared/novacart-common/src
-
-# Copy this service's pom and source
-COPY infra/eureka-server/pom.xml infra/eureka-server/pom.xml
-COPY infra/eureka-server/src     infra/eureka-server/src
+# The root POM declares every backend module. Maven validates that complete
+# reactor before applying -pl, so the build context must include all modules.
+COPY . .
 
 # Download deps (layer-cached; only re-runs when pom.xml changes)
 RUN ./mvnw dependency:go-offline -B -pl infra/eureka-server -am -q

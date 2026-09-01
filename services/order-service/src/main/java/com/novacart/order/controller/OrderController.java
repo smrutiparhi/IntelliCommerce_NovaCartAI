@@ -19,31 +19,45 @@ public class OrderController {
     private final OrderService orderService;
 
     @PostMapping
-    public ResponseEntity<Order> createOrder(@Valid @RequestBody CreateOrderRequest request) {
-        Order created = orderService.createOrder(request);
+    public ResponseEntity<Order> createOrder(@RequestHeader("X-User-Id") String userId, @Valid @RequestBody CreateOrderRequest request) {
+        CreateOrderRequest trustedRequest = new CreateOrderRequest(userId, request.items(), request.shippingAddressJson(), request.couponCode(), request.idempotencyKey());
+        Order created = orderService.createOrder(trustedRequest);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     @GetMapping("/{orderId}")
-    public ResponseEntity<Order> getOrderById(@PathVariable String orderId) {
-        return orderService.getOrderById(orderId)
+    public ResponseEntity<Order> getOrderById(@RequestHeader("X-User-Id") String userId, @PathVariable String orderId) {
+        return orderService.getOrderForUser(orderId, userId)
             .map(ResponseEntity::ok)
             .orElse(ResponseEntity.notFound().build());
     }
 
-    @GetMapping("/user/{userId}")
+    @GetMapping
     public ResponseEntity<Page<Order>> getOrdersByUserId(
-            @PathVariable String userId,
+            @RequestHeader("X-User-Id") String userId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         return ResponseEntity.ok(orderService.getOrdersByUserId(userId, PageRequest.of(page, size)));
     }
 
+    @GetMapping("/seller")
+    public ResponseEntity<Page<Order>> getSellerOrders(
+            @RequestHeader("X-User-Id") String sellerId,
+            @RequestHeader(value = "X-User-Roles", required = false) String roles,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        if (roles == null || (!roles.contains("ROLE_SELLER") && !roles.contains("ROLE_ADMIN"))) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        return ResponseEntity.ok(orderService.getOrdersForSeller(sellerId, PageRequest.of(page, size)));
+    }
+
     @PostMapping("/{orderId}/cancel")
     public ResponseEntity<Order> cancelOrder(
+            @RequestHeader("X-User-Id") String userId,
             @PathVariable String orderId,
             @RequestParam(defaultValue = "User requested cancellation") String reason) {
-        Order cancelled = orderService.cancelOrder(orderId, reason);
+        Order cancelled = orderService.cancelOrderForUser(orderId, userId, reason);
         return ResponseEntity.ok(cancelled);
     }
 }

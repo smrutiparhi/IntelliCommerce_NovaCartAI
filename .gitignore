@@ -8,6 +8,8 @@ target/
 node_modules/
 dist/
 dist-ssr/
+playwright-report/
+test-results/
 *.local
 
 # Env / secrets

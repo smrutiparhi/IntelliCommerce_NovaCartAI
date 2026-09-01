@@ -10,6 +10,7 @@ import com.novacart.payment.entity.*;
 import com.novacart.payment.repository.CouponRepository;
 import com.novacart.payment.repository.PaymentOutboxRepository;
 import com.novacart.payment.repository.PaymentRepository;
+import com.novacart.payment.repository.RefundRepository;
 import com.novacart.payment.util.RazorpaySignatureUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +28,7 @@ import java.util.UUID;
 public class PaymentService {
 
     private final PaymentRepository paymentRepository;
+    private final RefundRepository refundRepository;
     private final CouponRepository couponRepository;
     private final PaymentOutboxRepository outboxRepository;
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
@@ -38,7 +40,7 @@ public class PaymentService {
     private String webhookSecret;
 
     @Transactional
-    public Payment initializePayment(String orderId, String userId, long amountPaise) {
+    public Payment initializePayment(String orderId, String userId, long amountPaise, String currency) {
         Optional<Payment> existingOpt = paymentRepository.findByOrderId(orderId);
         if (existingOpt.isPresent()) {
             return existingOpt.get();
@@ -51,7 +53,7 @@ public class PaymentService {
             .userId(userId)
             .razorpayOrderId(razorpayOrderId)
             .amountPaise(amountPaise)
-            .currency("INR")
+            .currency(currency == null || currency.isBlank() ? "INR" : currency)
             .status(PaymentStatus.CREATED)
             .signatureVerified(false)
             .idempotencyKey(UUID.randomUUID().toString())
@@ -62,9 +64,13 @@ public class PaymentService {
     }
 
     @Transactional
-    public Payment processPayment(ProcessPaymentRequest request) {
+    public Payment processPayment(ProcessPaymentRequest request, String authenticatedUserId) {
         Payment payment = paymentRepository.findByOrderId(request.orderId())
-            .orElseGet(() -> initializePayment(request.orderId(), request.userId(), request.amountPaise()));
+            .orElseThrow(() -> new IllegalStateException("Payment is not ready. Stock must be reserved first."));
+
+        if (!payment.getUserId().equals(authenticatedUserId)) {
+            throw new IllegalArgumentException("Payment not found");
+        }
 
         // Simulation flag or Signature Check
         boolean isSignatureValid = false;
@@ -121,6 +127,20 @@ public class PaymentService {
         log.info("Razorpay Webhook signature verified successfully!");
         // Process webhook payload...
         return true;
+    }
+
+    @Transactional
+    public void refundCapturedPayment(String orderId, String reason) {
+        paymentRepository.findByOrderId(orderId).ifPresent(payment -> {
+            if (payment.getStatus() != PaymentStatus.CAPTURED) return;
+            refundRepository.save(Refund.builder()
+                .paymentId(payment.getId()).orderId(orderId).amountPaise(payment.getAmountPaise())
+                .reason(reason).status("PROCESSED")
+                .razorpayRefundId("rfnd_mock_" + UUID.randomUUID().toString().substring(0, 8)).build());
+            payment.setStatus(PaymentStatus.REFUNDED);
+            paymentRepository.save(payment);
+            log.info("Payment refunded for cancelled orderId={}", orderId);
+        });
     }
 
     public long calculateDiscount(ApplyCouponRequest request) {

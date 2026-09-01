@@ -41,6 +41,11 @@ export function ForgotPasswordPage() {
         <Button type="submit" size="lg" className="mt-2 w-full" disabled={mutation.isPending}>
           {mutation.isPending ? 'Sending…' : 'Send reset link'}
         </Button>
+        {mutation.isError && (
+          <p role="alert" className="rounded-xl bg-rose-50 px-4 py-3 text-body-sm text-rose-600">
+            We couldn't send the reset link. Please check your connection and try again.
+          </p>
+        )}
       </form>
 
       <p className="mt-6 text-center text-body-sm text-slate-500 dark:text-slate-400">

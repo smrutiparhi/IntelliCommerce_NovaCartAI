@@ -2,14 +2,7 @@
 FROM eclipse-temurin:21-jdk-alpine AS build
 WORKDIR /workspace
 
-COPY mvnw mvnw.cmd pom.xml ./
-COPY .mvn .mvn
-
-COPY shared/novacart-common/pom.xml shared/novacart-common/pom.xml
-COPY shared/novacart-common/src     shared/novacart-common/src
-
-COPY services/auth-service/pom.xml services/auth-service/pom.xml
-COPY services/auth-service/src     services/auth-service/src
+COPY . .
 
 RUN ./mvnw dependency:go-offline -B -pl services/auth-service -am -q
 

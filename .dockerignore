@@ -1,0 +1,8 @@
+.git
+.agents
+.codex
+**/target
+**/node_modules
+**/dist
+ecommerce-frontend
+docs

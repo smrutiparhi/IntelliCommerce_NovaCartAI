@@ -1,317 +1,93 @@
-import React, { useState } from 'react';
-import { ShoppingBag, Tag, MapPin, ArrowRight, ShieldCheck, Check } from 'lucide-react';
-import { Order } from '../types/saga';
-import { RazorpayWidget } from '../components/RazorpayWidget';
-import { OrderTrackingTimeline } from '../components/OrderTrackingTimeline';
+import { zodResolver } from '@hookform/resolvers/zod'
+import { ArrowLeft, ArrowRight, Check, CreditCard, MapPin, PackageOpen, ShieldCheck, ShoppingBag } from 'lucide-react'
+import { useForm } from 'react-hook-form'
+import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { z } from 'zod'
+import { PRODUCTS } from '../data/store-products'
+import { useCheckoutStore, type DeliveryAddress } from '../stores/checkout-store'
+import { useCommerceStore } from '../stores/commerce-store'
+import { useAuthStore } from '../stores/auth-store'
+import { createOrder, serializeAddress } from '../api/orders'
 
-export const CheckoutPage: React.FC = () => {
-  const [userId] = useState('user-hemanth-208');
-  const [shippingAddress] = useState({
-    line1: 'KL University Campus, Vaddeswaram',
-    city: 'Guntur',
-    state: 'Andhra Pradesh',
-    postalCode: '522502',
-    country: 'India'
-  });
+const addressSchema = z.object({
+  fullName: z.string().trim().min(3, 'Enter the recipient’s full name'),
+  phone: z.string().trim().regex(/^[6-9]\d{9}$/, 'Enter a valid 10-digit Indian mobile number'),
+  line1: z.string().trim().min(5, 'Enter a complete street address'),
+  line2: z.string().trim().optional(),
+  city: z.string().trim().min(2, 'Enter the city'),
+  state: z.string().trim().min(2, 'Enter the state'),
+  postalCode: z.string().trim().regex(/^\d{6}$/, 'Enter a valid 6-digit PIN code'),
+})
 
-  const [couponCode, setCouponCode] = useState('');
-  const [appliedDiscountPaise, setAppliedDiscountPaise] = useState(0);
-  const [couponMessage, setCouponMessage] = useState('');
-  const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+const fields: Array<{ name: keyof DeliveryAddress; label: string; placeholder: string; wide?: boolean }> = [
+  { name: 'fullName', label: 'Full name', placeholder: 'Recipient name', wide: true },
+  { name: 'phone', label: 'Mobile number', placeholder: '10-digit mobile number' },
+  { name: 'postalCode', label: 'PIN code', placeholder: '6-digit PIN code' },
+  { name: 'line1', label: 'Address', placeholder: 'House number, street, area', wide: true },
+  { name: 'line2', label: 'Landmark (optional)', placeholder: 'Nearby landmark', wide: true },
+  { name: 'city', label: 'City', placeholder: 'City' },
+  { name: 'state', label: 'State', placeholder: 'State' },
+]
 
-  // Mock checkout items
-  const items = [
-    {
-      productId: 'prod-laptop-001',
-      productName: 'MacBook Pro M3 Max (16-inch, 36GB RAM)',
-      productImage: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=300&q=80',
-      sellerId: 'seller-apple-store',
-      unitPricePaise: 24990000, // ₹2,49,900 stored as integer paise
-      quantity: 1
-    },
-    {
-      productId: 'prod-headphones-002',
-      productName: 'Sony WH-1000XM5 Wireless Headphones',
-      productImage: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=300&q=80',
-      sellerId: 'seller-sony-india',
-      unitPricePaise: 2999000, // ₹29,990 stored as integer paise
-      quantity: 1
-    }
-  ];
+export function CheckoutPage() {
+  const navigate = useNavigate()
+  const cart = useCommerceStore((state) => state.cart)
+  const address = useCheckoutStore((state) => state.address)
+  const setAddress = useCheckoutStore((state) => state.setAddress)
+  const idempotencyKey = useCheckoutStore((state) => state.idempotencyKey)
+  const setIdempotencyKey = useCheckoutStore((state) => state.setIdempotencyKey)
+  const setActiveOrder = useCheckoutStore((state) => state.setActiveOrder)
+  const user = useAuthStore((state) => state.user)
+  const [serverError, setServerError] = useState('')
+  const items = Object.entries(cart).flatMap(([id, quantity]) => {
+    const product = PRODUCTS.find((item) => item.id === id)
+    return product ? [{ product, quantity }] : []
+  })
+  const subtotal = items.reduce((sum, item) => sum + item.product.priceINR * item.quantity, 0)
+  const originalTotal = items.reduce((sum, item) => sum + (item.product.originalPriceINR ?? item.product.priceINR) * item.quantity, 0)
+  const savings = originalTotal - subtotal
+  const itemCount = items.reduce((sum, item) => sum + item.quantity, 0)
+  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<DeliveryAddress>({
+    resolver: zodResolver(addressSchema),
+    defaultValues: address ?? { fullName: '', phone: '', line1: '', line2: '', city: '', state: '', postalCode: '' },
+  })
 
-  const subtotalPaise = items.reduce((acc, i) => acc + i.unitPricePaise * i.quantity, 0);
-  const totalPaise = Math.max(0, subtotalPaise - appliedDiscountPaise);
-
-  const handleApplyCoupon = async () => {
-    if (!couponCode) return;
+  async function continueToPayment(values: DeliveryAddress) {
+    setAddress(values)
+    setServerError('')
+    const requestKey = idempotencyKey ?? crypto.randomUUID()
+    if (!idempotencyKey) setIdempotencyKey(requestKey)
     try {
-      const response = await fetch('/api/v1/payments/coupons/apply', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          code: couponCode.trim(),
-          orderAmountPaise: subtotalPaise
-        })
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setAppliedDiscountPaise(data.discountPaise);
-        setCouponMessage(`Applied ${data.code}! Saved ₹${(data.discountPaise / 100).toLocaleString()}`);
-      } else {
-        // Fallback local coupon calculation if payment service mock offline
-        if (couponCode.toUpperCase() === 'SAVE10') {
-          const discount = Math.round(subtotalPaise * 0.1);
-          setAppliedDiscountPaise(discount);
-          setCouponMessage(`Applied SAVE10! Saved ₹${(discount / 100).toLocaleString()}`);
-        } else {
-          setCouponMessage('Invalid coupon code');
-        }
-      }
+      const order = await createOrder({
+        userId: user?.id ?? '',
+        shippingAddressJson: serializeAddress(values),
+        idempotencyKey: requestKey,
+        items: items.map(({ product, quantity }) => ({ productId: product.id, productName: product.title, productImage: product.image, sellerId: 'novacart-seed', unitPricePaise: product.priceINR * 100, quantity })),
+      })
+      setActiveOrder(order)
+      navigate('/payment')
     } catch {
-      if (couponCode.toUpperCase() === 'SAVE10') {
-        const discount = Math.round(subtotalPaise * 0.1);
-        setAppliedDiscountPaise(discount);
-        setCouponMessage(`Applied SAVE10! Saved ₹${(discount / 100).toLocaleString()}`);
-      } else {
-        setCouponMessage('Invalid coupon code');
-      }
+      setServerError('Order creation is unavailable. Start the Order Service and try again—your cart and address are saved.')
     }
-  };
+  }
 
-  const handleCreateOrder = async () => {
-    setIsSubmitting(true);
-    const idempotencyKey = 'idemp_' + Date.now();
-
-    const orderPayload = {
-      userId,
-      items: items.map(i => ({
-        productId: i.productId,
-        productName: i.productName,
-        productImage: i.productImage,
-        sellerId: i.sellerId,
-        unitPricePaise: i.unitPricePaise,
-        quantity: i.quantity
-      })),
-      shippingAddressJson: JSON.stringify(shippingAddress),
-      couponCode: couponCode || undefined,
-      idempotencyKey
-    };
-
-    try {
-      const response = await fetch('/api/v1/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(orderPayload)
-      });
-
-      if (response.ok) {
-        const orderData = await response.json();
-        setCreatedOrder(orderData);
-      } else {
-        // Local simulation fallback
-        const mockOrder: Order = {
-          id: 'ord_' + Math.random().toString(36).substring(2, 9),
-          orderNumber: 'NC-' + Date.now(),
-          userId,
-          shippingAddressJson: JSON.stringify(shippingAddress),
-          items: items.map(i => ({ ...i, id: 'item_' + Math.random(), subtotalPaise: i.unitPricePaise * i.quantity })),
-          subtotalPaise,
-          shippingFeePaise: 0,
-          discountPaise: appliedDiscountPaise,
-          taxPaise: 0,
-          totalPaise,
-          currency: 'INR',
-          status: 'PENDING',
-          sagaState: 'ORDER_PLACED',
-          idempotencyKey,
-          createdAt: new Date().toISOString()
-        };
-        setCreatedOrder(mockOrder);
-      }
-    } catch {
-      const mockOrder: Order = {
-        id: 'ord_' + Math.random().toString(36).substring(2, 9),
-        orderNumber: 'NC-' + Date.now(),
-        userId,
-        shippingAddressJson: JSON.stringify(shippingAddress),
-        items: items.map(i => ({ ...i, id: 'item_' + Math.random(), subtotalPaise: i.unitPricePaise * i.quantity })),
-        subtotalPaise,
-        shippingFeePaise: 0,
-        discountPaise: appliedDiscountPaise,
-        taxPaise: 0,
-        totalPaise,
-        currency: 'INR',
-        status: 'PENDING',
-        sagaState: 'ORDER_PLACED',
-        idempotencyKey,
-        createdAt: new Date().toISOString()
-      };
-      setCreatedOrder(mockOrder);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handlePaymentSuccess = (paymentId: string) => {
-    if (createdOrder) {
-      setCreatedOrder({
-        ...createdOrder,
-        status: 'CONFIRMED',
-        sagaState: 'ORDER_CONFIRMED',
-        paymentId
-      });
-    }
-  };
-
-  const handlePaymentFailure = (reason: string) => {
-    if (createdOrder) {
-      setCreatedOrder({
-        ...createdOrder,
-        status: 'CANCELLED',
-        sagaState: 'PAYMENT_FAILED'
-      });
-    }
-  };
+  if (items.length === 0) return <main className="min-h-[70vh] bg-[var(--nc-bg)] px-5 py-12 text-[var(--nc-text)]"><div className="mx-auto max-w-3xl"><section className="rounded-[2rem] border border-black/10 bg-[var(--nc-surface)] px-6 py-20 text-center shadow-card dark:border-white/10"><div className="mx-auto grid h-20 w-20 place-items-center rounded-[1.7rem] bg-slate-950 text-white"><PackageOpen className="h-8 w-8" /></div><p className="nc-label mt-7">Checkout paused</p><h1 className="mt-3 text-h2">Your cart has no items.</h1><p className="mx-auto mt-4 max-w-md text-sm leading-6 text-slate-500">Add a product before entering delivery or payment information.</p><Link to="/categories" className="nc-primary mt-8">Explore products <ArrowRight className="h-4 w-4" /></Link></section></div></main>
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8 space-y-8">
-      <div className="flex justify-between items-center pb-4 border-b border-slate-800">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-100">Checkout</h1>
-          <p className="text-sm text-slate-400 mt-1">Slice 3: Transactions & Kafka Saga Choreography</p>
-        </div>
-        <div className="flex items-center gap-2 text-xs text-sky-400 bg-sky-950/60 px-3 py-1.5 rounded-full border border-sky-900">
-          <ShieldCheck className="w-4 h-4" /> Atomic Outbox + Inbox Idempotency Protected
+    <main className="min-h-[70vh] bg-[var(--nc-bg)] px-5 py-10 text-[var(--nc-text)] sm:px-8 lg:py-14">
+      <div className="mx-auto max-w-6xl">
+        <Link to="/cart" className="inline-flex items-center gap-2 text-sm font-bold text-slate-500 transition hover:text-violet-600 dark:hover:text-[#dfff36]"><ArrowLeft className="h-4 w-4" /> Back to cart</Link>
+        <div className="mt-7 flex flex-col justify-between gap-5 sm:flex-row sm:items-end"><div><p className="nc-label">Secure purchase</p><h1 className="mt-3 text-h1">Checkout</h1><p className="mt-4 max-w-xl text-base leading-7 text-slate-500">Confirm where your order should arrive before continuing to protected payment.</p></div><div className="inline-flex w-fit items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-extrabold text-emerald-800 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-300"><ShieldCheck className="h-4 w-4" /> Secure flow</div></div>
+
+        <ol aria-label="Checkout progress" className="mt-9 grid grid-cols-3 gap-2">{[{ label: 'Cart', icon: ShoppingBag }, { label: 'Delivery', icon: MapPin }, { label: 'Payment', icon: CreditCard }].map(({ label, icon: Icon }, index) => <li key={label} className={`flex items-center justify-center gap-2 rounded-2xl border px-3 py-4 text-xs font-bold ${index < 2 ? 'border-violet-200 bg-violet-50 text-violet-700 dark:border-[#dfff36]/20 dark:bg-[#dfff36]/[.06] dark:text-[#dfff36]' : 'border-black/10 bg-[var(--nc-surface)] text-slate-500 dark:border-white/10'}`}>{index === 0 ? <Check className="h-4 w-4" /> : <Icon className="h-4 w-4" />}{label}</li>)}</ol>
+
+        <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+          <form onSubmit={handleSubmit(continueToPayment)} className="rounded-[2rem] border border-black/10 bg-[var(--nc-surface)] p-6 shadow-[0_20px_60px_rgba(30,26,18,.07)] dark:border-white/10 sm:p-8"><div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-violet-100 text-violet-700 dark:bg-[#dfff36]/10 dark:text-[#dfff36]"><MapPin className="h-5 w-5" /></span><div><p className="text-lg font-black">Delivery address</p><p className="mt-1 text-xs text-slate-500">Used only to fulfil this order.</p></div></div><div className="mt-7 grid gap-5 sm:grid-cols-2">{fields.map((field) => <label key={field.name} className={`block ${field.wide ? 'sm:col-span-2' : ''}`}><span className="mb-2 block text-xs font-bold text-slate-600 dark:text-slate-400">{field.label}</span><input {...register(field.name)} inputMode={field.name === 'phone' || field.name === 'postalCode' ? 'numeric' : undefined} autoComplete={field.name === 'fullName' ? 'name' : field.name === 'phone' ? 'tel' : field.name === 'postalCode' ? 'postal-code' : field.name === 'city' ? 'address-level2' : field.name === 'state' ? 'address-level1' : 'street-address'} placeholder={field.placeholder} className={`h-12 w-full rounded-xl border bg-black/[.025] px-4 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:ring-4 focus:ring-violet-500/10 dark:bg-white/[.035] dark:text-white dark:focus:border-[#dfff36]/60 ${errors[field.name] ? 'border-rose-500' : 'border-black/10 dark:border-white/10'}`} />{errors[field.name] && <span role="alert" className="mt-1.5 block text-xs text-rose-500">{errors[field.name]?.message}</span>}</label>)}</div>{serverError && <p role="alert" className="mt-5 rounded-xl border border-rose-300/40 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-300">{serverError}</p>}<button disabled={isSubmitting} className="nc-primary mt-8 w-full">{isSubmitting ? 'Creating secure order…' : 'Continue to payment'} <ArrowRight className="h-4 w-4" /></button><p className="mt-4 text-center text-[11px] text-slate-500">You can review the final amount before confirming payment.</p></form>
+
+          <aside className="h-fit rounded-[2rem] bg-slate-950 p-6 text-white shadow-xl lg:sticky lg:top-28"><p className="text-xs font-black uppercase tracking-[.18em] text-[#dfff36]">Order summary</p><p className="mt-2 text-xs text-slate-500">{itemCount} {itemCount === 1 ? 'item' : 'items'}</p><div className="mt-6 max-h-72 space-y-4 overflow-y-auto pr-1">{items.map(({ product, quantity }) => <div key={product.id} className="grid grid-cols-[58px_1fr_auto] items-center gap-3"><img src={product.image} alt="" className="h-14 w-14 rounded-xl object-cover" /><div className="min-w-0"><p className="truncate text-xs font-bold">{product.title}</p><p className="mt-1 text-[10px] text-slate-500">Qty {quantity}</p></div><p className="text-xs font-bold">₹{(product.priceINR * quantity).toLocaleString('en-IN')}</p></div>)}</div><div className="mt-6 space-y-3 border-t border-white/10 pt-5 text-sm"><div className="flex justify-between text-slate-400"><span>Subtotal</span><span>₹{subtotal.toLocaleString('en-IN')}</span></div><div className="flex justify-between text-slate-400"><span>Delivery</span><span className="text-emerald-400">Free</span></div>{savings > 0 && <div className="flex justify-between text-emerald-400"><span>Savings</span><span>−₹{savings.toLocaleString('en-IN')}</span></div>}<div className="flex items-end justify-between border-t border-white/10 pt-5"><span className="text-slate-400">Total</span><strong className="text-2xl">₹{subtotal.toLocaleString('en-IN')}</strong></div></div></aside>
         </div>
       </div>
-
-      {!createdOrder ? (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 space-y-6">
-            {/* Cart items */}
-            <div className="glass-panel p-6 rounded-2xl border border-slate-800">
-              <h3 className="font-semibold text-lg text-slate-100 flex items-center gap-2 mb-4">
-                <ShoppingBag className="w-5 h-5 text-sky-400" /> Cart Summary ({items.length} items)
-              </h3>
-              <div className="divide-y divide-slate-800">
-                {items.map(item => (
-                  <div key={item.productId} className="py-4 flex gap-4 items-center">
-                    <img src={item.productImage} alt={item.productName} className="w-16 h-16 rounded-xl object-cover border border-slate-800" />
-                    <div className="flex-1">
-                      <h4 className="font-medium text-slate-200 text-sm">{item.productName}</h4>
-                      <span className="text-xs text-slate-400">Seller: {item.sellerId}</span>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-semibold text-slate-100">₹{(item.unitPricePaise / 100).toLocaleString('en-IN')}</div>
-                      <span className="text-xs text-slate-400">Qty: {item.quantity}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Shipping address */}
-            <div className="glass-panel p-6 rounded-2xl border border-slate-800">
-              <h3 className="font-semibold text-lg text-slate-100 flex items-center gap-2 mb-3">
-                <MapPin className="w-5 h-5 text-sky-400" /> Delivery Address
-              </h3>
-              <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 text-sm text-slate-300">
-                <div className="font-semibold text-slate-100">N Hemanth Babu</div>
-                <div>{shippingAddress.line1}</div>
-                <div>{shippingAddress.city}, {shippingAddress.state} - {shippingAddress.postalCode}</div>
-                <div className="text-xs text-slate-500 mt-1">{shippingAddress.country}</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Order Summary sidebar */}
-          <div className="space-y-6">
-            <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-4">
-              <h3 className="font-semibold text-lg text-slate-100">Price Details</h3>
-              
-              <div className="space-y-2 text-sm text-slate-300">
-                <div className="flex justify-between">
-                  <span>Subtotal</span>
-                  <span>₹{(subtotalPaise / 100).toLocaleString('en-IN')}</span>
-                </div>
-                {appliedDiscountPaise > 0 && (
-                  <div className="flex justify-between text-emerald-400">
-                    <span>Discount</span>
-                    <span>-₹{(appliedDiscountPaise / 100).toLocaleString('en-IN')}</span>
-                  </div>
-                )}
-                <div className="flex justify-between text-xs text-slate-500">
-                  <span>Currency Storage</span>
-                  <span className="font-mono text-sky-400">Paise (Integer)</span>
-                </div>
-                <div className="pt-3 border-t border-slate-800 flex justify-between font-bold text-lg text-slate-100">
-                  <span>Total</span>
-                  <span className="text-sky-400">₹{(totalPaise / 100).toLocaleString('en-IN')}</span>
-                </div>
-              </div>
-
-              {/* Coupon input */}
-              <div className="pt-4 border-t border-slate-800">
-                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1 mb-2">
-                  <Tag className="w-3.5 h-3.5" /> Apply Promo Code
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={couponCode}
-                    onChange={e => setCouponCode(e.target.value)}
-                    placeholder="Try SAVE10"
-                    className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-sky-500"
-                  />
-                  <button
-                    onClick={handleApplyCoupon}
-                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-sky-400 font-semibold text-xs rounded-xl transition-all border border-slate-700"
-                  >
-                    Apply
-                  </button>
-                </div>
-                {couponMessage && (
-                  <p className="text-xs text-emerald-400 mt-2 font-medium">{couponMessage}</p>
-                )}
-              </div>
-
-              <button
-                onClick={handleCreateOrder}
-                disabled={isSubmitting}
-                className="w-full py-4 bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold rounded-xl shadow-lg shadow-sky-500/25 flex items-center justify-center gap-2 transition-all mt-4 disabled:opacity-50"
-              >
-                {isSubmitting ? (
-                  <div className="w-5 h-5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <>
-                    Place Order & Trigger Saga <ArrowRight className="w-5 h-5" />
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-8">
-          <OrderTrackingTimeline
-            sagaState={createdOrder.sagaState}
-            status={createdOrder.status}
-            orderNumber={createdOrder.orderNumber}
-          />
-
-          {createdOrder.status !== 'CONFIRMED' && createdOrder.status !== 'CANCELLED' && (
-            <div className="max-w-2xl mx-auto">
-              <RazorpayWidget
-                order={createdOrder}
-                onPaymentSuccess={handlePaymentSuccess}
-                onPaymentFailure={handlePaymentFailure}
-              />
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
+    </main>
+  )
+}

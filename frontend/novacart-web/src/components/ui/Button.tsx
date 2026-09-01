@@ -10,17 +10,17 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantStyles: Record<Variant, string> = {
-  primary: 'bg-primary-600 text-white hover:bg-primary-700 active:bg-primary-700',
+  primary: 'bg-indigo-500 text-white hover:bg-indigo-400 active:bg-indigo-600 shadow-card',
   secondary:
-    'bg-white text-slate-900 border border-slate-300 hover:bg-slate-50 dark:bg-dark-surface dark:text-slate-100 dark:border-dark-border dark:hover:bg-dark-border',
+    'bg-white text-slate-950 border border-white hover:bg-indigo-100 dark:bg-white/[.05] dark:text-slate-100 dark:border-white/10 dark:hover:bg-white/10',
   ghost: 'bg-transparent text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-dark-surface',
   destructive: 'bg-error-500 text-white hover:bg-rose-600',
 }
 
 const sizeStyles: Record<Size, string> = {
-  sm: 'h-8 px-3 text-body-sm rounded-md',
-  md: 'h-10 px-4 text-body rounded-md',
-  lg: 'h-12 px-6 text-body-lg rounded-lg',
+  sm: 'h-9 px-4 text-body-sm rounded-full',
+  md: 'h-10 px-5 text-body-sm rounded-full',
+  lg: 'h-12 px-6 text-body-sm rounded-full',
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -28,7 +28,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     <button
       ref={ref}
       className={cn(
-        'inline-flex items-center justify-center font-medium transition-colors duration',
+        'inline-flex items-center justify-center font-semibold transition duration-200 active:scale-[.99]',
         'disabled:opacity-50 disabled:pointer-events-none',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2',
         variantStyles[variant],
