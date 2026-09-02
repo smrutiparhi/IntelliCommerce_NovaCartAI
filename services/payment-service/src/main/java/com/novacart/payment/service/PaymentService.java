@@ -144,11 +144,19 @@ public class PaymentService {
     }
 
     public long calculateDiscount(ApplyCouponRequest request) {
-        Coupon coupon = couponRepository.findByCodeAndIsActiveTrue(request.code())
+        String normalizedCode = request.code().trim().toUpperCase();
+        Coupon coupon = couponRepository.findByCodeAndIsActiveTrue(normalizedCode)
             .orElseThrow(() -> new IllegalArgumentException("Invalid or inactive coupon code"));
 
+        Instant now = Instant.now();
+        if ((coupon.getValidFrom() != null && now.isBefore(coupon.getValidFrom()))
+                || (coupon.getValidTo() != null && now.isAfter(coupon.getValidTo()))
+                || (coupon.getUsageLimit() != null && coupon.getUsedCount() >= coupon.getUsageLimit())) {
+            throw new IllegalArgumentException("Coupon is no longer available");
+        }
+
         if (request.orderAmountPaise() < (coupon.getMinOrderValuePaise() != null ? coupon.getMinOrderValuePaise() : 0L)) {
-            throw new IllegalArgumentException("Minimum order value not met for coupon " + request.code());
+            throw new IllegalArgumentException("Minimum order value not met for coupon " + normalizedCode);
         }
 
         long discount = 0L;

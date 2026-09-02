@@ -31,7 +31,7 @@ public class InventorySeedConfig {
     );
 
     private static List<String> productIds() {
-        List<String> ids = new ArrayList<>();
+        List<String> ids = new ArrayList<>(BASE_PRODUCT_IDS);
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(
             InventorySeedConfig.class.getResourceAsStream("/real-products.tsv"), StandardCharsets.UTF_8))) {
             reader.lines().skip(1).forEach(line -> ids.add(line.split("\\t", 2)[0]));

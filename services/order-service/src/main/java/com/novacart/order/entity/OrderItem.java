@@ -32,6 +32,9 @@ public class OrderItem {
 
     private String sellerId;
 
+    @Enumerated(EnumType.STRING)
+    private FulfillmentStatus fulfillmentStatus;
+
     @Column(nullable = false)
     private Long unitPricePaise;
 
@@ -40,4 +43,11 @@ public class OrderItem {
 
     @Column(nullable = false)
     private Long subtotalPaise;
+
+    @PrePersist
+    void initializeFulfillmentStatus() {
+        if (fulfillmentStatus == null) {
+            fulfillmentStatus = FulfillmentStatus.AWAITING_PAYMENT;
+        }
+    }
 }

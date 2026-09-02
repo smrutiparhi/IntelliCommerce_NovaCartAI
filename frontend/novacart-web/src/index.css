@@ -2,6 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
+@media print {
+  body * { visibility: hidden !important; }
+  .nc-print-invoice, .nc-print-invoice * { visibility: visible !important; }
+  .nc-print-invoice { display: block !important; position: absolute; inset: 0; width: 100%; }
+  @page { margin: 12mm; }
+}
+
 :root {
   color-scheme: light;
   --nc-bg: #f3f1eb;

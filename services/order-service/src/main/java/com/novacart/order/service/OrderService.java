@@ -13,6 +13,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.web.client.RestClient;
 
 import java.time.Instant;
 import java.util.List;
@@ -27,6 +29,9 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final OrderOutboxRepository outboxRepository;
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
+
+    @Value("${novacart.payment-service-url:http://payment-service:8086}")
+    private String paymentServiceUrl;
 
     @Transactional
     public Order createOrder(CreateOrderRequest request) {
@@ -44,7 +49,7 @@ public class OrderService {
             .orderNumber(orderNumber)
             .userId(request.userId())
             .shippingAddressJson(request.shippingAddressJson())
-            .couponCode(request.couponCode())
+            .couponCode(request.couponCode() == null || request.couponCode().isBlank() ? null : request.couponCode().trim().toUpperCase())
             .idempotencyKey(request.idempotencyKey())
             .status(OrderStatus.PENDING)
             .sagaState(SagaState.ORDER_PLACED)
@@ -73,8 +78,10 @@ public class OrderService {
             order.addItem(item);
         }
 
+        long discountPaise = validateCoupon(request.couponCode(), subtotalPaise);
         order.setSubtotalPaise(subtotalPaise);
-        order.setTotalPaise(subtotalPaise); // adjust for taxes/discount if applicable
+        order.setDiscountPaise(discountPaise);
+        order.setTotalPaise(Math.max(0L, subtotalPaise - discountPaise));
 
         Order savedOrder = orderRepository.save(order);
 
@@ -115,6 +122,7 @@ public class OrderService {
         orderRepository.findById(payload.orderId()).ifPresent(order -> {
             order.setSagaState(SagaState.STOCK_RESERVATION_FAILED);
             order.setStatus(OrderStatus.CANCELLED);
+            order.getItems().forEach(item -> item.setFulfillmentStatus(FulfillmentStatus.CANCELLED));
             orderRepository.save(order);
 
             OrderCancelledPayload cancelledPayload = new OrderCancelledPayload(
@@ -131,6 +139,7 @@ public class OrderService {
             order.setSagaState(SagaState.PAYMENT_SUCCESSFUL);
             order.setStatus(OrderStatus.CONFIRMED);
             order.setPaymentId(payload.paymentId());
+            order.getItems().forEach(item -> item.setFulfillmentStatus(FulfillmentStatus.PROCESSING));
             orderRepository.save(order);
 
             OrderConfirmedPayload confirmedPayload = new OrderConfirmedPayload(
@@ -146,6 +155,7 @@ public class OrderService {
         orderRepository.findById(payload.orderId()).ifPresent(order -> {
             order.setSagaState(SagaState.PAYMENT_FAILED);
             order.setStatus(OrderStatus.CANCELLED);
+            order.getItems().forEach(item -> item.setFulfillmentStatus(FulfillmentStatus.CANCELLED));
             orderRepository.save(order);
 
             OrderCancelledPayload cancelledPayload = new OrderCancelledPayload(
@@ -171,6 +181,7 @@ public class OrderService {
 
         order.setStatus(OrderStatus.CANCELLED);
         order.setSagaState(SagaState.ORDER_CANCELLED);
+        order.getItems().forEach(item -> item.setFulfillmentStatus(FulfillmentStatus.CANCELLED));
         Order saved = orderRepository.save(order);
 
         OrderCancelledPayload cancelledPayload = new OrderCancelledPayload(
@@ -205,6 +216,59 @@ public class OrderService {
         return orderRepository.findDistinctByItemsSellerIdOrderByCreatedAtDesc(sellerId, pageable);
     }
 
+    @Transactional
+    public Order updateSellerFulfillment(String orderId, String sellerId, FulfillmentStatus requestedStatus) {
+        if (requestedStatus != FulfillmentStatus.SHIPPED && requestedStatus != FulfillmentStatus.DELIVERED) {
+            throw new IllegalArgumentException("Sellers may only mark items as shipped or delivered");
+        }
+
+        Order order = orderRepository.findById(orderId)
+            .orElseThrow(() -> new IllegalArgumentException("Order not found"));
+        if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.PENDING
+                || order.getStatus() == OrderStatus.AWAITING_PAYMENT) {
+            throw new IllegalArgumentException("This order is not ready for fulfillment");
+        }
+
+        List<OrderItem> sellerItems = order.getItems().stream()
+            .filter(item -> sellerId.equals(item.getSellerId()))
+            .toList();
+        if (sellerItems.isEmpty()) {
+            throw new IllegalArgumentException("Order not found for this seller");
+        }
+
+        FulfillmentStatus requiredCurrent = requestedStatus == FulfillmentStatus.SHIPPED
+            ? FulfillmentStatus.PROCESSING
+            : FulfillmentStatus.SHIPPED;
+        boolean validTransition = sellerItems.stream().allMatch(item -> effectiveStatus(item, order) == requiredCurrent);
+        if (!validTransition) {
+            throw new IllegalArgumentException("Invalid fulfillment transition to " + requestedStatus);
+        }
+        sellerItems.forEach(item -> item.setFulfillmentStatus(requestedStatus));
+
+        boolean allDelivered = order.getItems().stream()
+            .allMatch(item -> effectiveStatus(item, order) == FulfillmentStatus.DELIVERED);
+        boolean allShipped = order.getItems().stream()
+            .allMatch(item -> {
+                FulfillmentStatus status = effectiveStatus(item, order);
+                return status == FulfillmentStatus.SHIPPED || status == FulfillmentStatus.DELIVERED;
+            });
+        if (allDelivered) order.setStatus(OrderStatus.DELIVERED);
+        else if (allShipped) order.setStatus(OrderStatus.SHIPPED);
+
+        return orderRepository.save(order);
+    }
+
+    private FulfillmentStatus effectiveStatus(OrderItem item, Order order) {
+        if (item.getFulfillmentStatus() != null) return item.getFulfillmentStatus();
+        return switch (order.getStatus()) {
+            case CANCELLED -> FulfillmentStatus.CANCELLED;
+            case SHIPPED -> FulfillmentStatus.SHIPPED;
+            case DELIVERED -> FulfillmentStatus.DELIVERED;
+            case CONFIRMED -> FulfillmentStatus.PROCESSING;
+            default -> FulfillmentStatus.AWAITING_PAYMENT;
+        };
+    }
+
     private void saveOutboxEvent(String aggregateId, String eventType, Object payload) {
         try {
             EventEnvelope<Object> envelope = new EventEnvelope<>(
@@ -230,4 +294,21 @@ public class OrderService {
             throw new RuntimeException("Outbox error", e);
         }
     }
+
+    private long validateCoupon(String couponCode, long subtotalPaise) {
+        if (couponCode == null || couponCode.isBlank()) return 0L;
+        CouponQuote quote = RestClient.create(paymentServiceUrl)
+            .post()
+            .uri("/api/v1/payments/coupons/apply")
+            .body(new CouponRequest(couponCode.trim().toUpperCase(), subtotalPaise))
+            .retrieve()
+            .body(CouponQuote.class);
+        if (quote == null || quote.discountPaise() < 0L || quote.discountPaise() > subtotalPaise) {
+            throw new IllegalArgumentException("Invalid coupon response");
+        }
+        return quote.discountPaise();
+    }
+
+    private record CouponRequest(String code, Long orderAmountPaise) {}
+    private record CouponQuote(String code, Long discountPaise, Long finalAmountPaise) {}
 }

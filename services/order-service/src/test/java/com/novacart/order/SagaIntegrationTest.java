@@ -87,7 +87,7 @@ public class SagaIntegrationTest {
             "prod-1", "Laptop", "laptop.png", "seller-1", 5000000L, 1
         );
         CreateOrderRequest request = new CreateOrderRequest(
-            "user-1", List.of(item), "{}", "DISCOUNT10", UUID.randomUUID().toString()
+            "user-1", List.of(item), "{}", null, UUID.randomUUID().toString()
         );
 
         Order createdOrder = orderService.createOrder(request);

@@ -1,4 +1,5 @@
 export type OrderStatus = 'PENDING' | 'AWAITING_PAYMENT' | 'CONFIRMED' | 'CANCELLED' | 'SHIPPED' | 'DELIVERED';
+export type FulfillmentStatus = 'AWAITING_PAYMENT' | 'PROCESSING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
 
 export type SagaState = 
   | 'ORDER_PLACED'
@@ -15,6 +16,7 @@ export interface OrderItem {
   productName: string;
   productImage?: string;
   sellerId?: string;
+  fulfillmentStatus?: FulfillmentStatus;
   unitPricePaise: number;
   quantity: number;
   subtotalPaise: number;

@@ -1,6 +1,7 @@
 package com.novacart.order.controller;
 
 import com.novacart.order.dto.CreateOrderRequest;
+import com.novacart.order.dto.UpdateFulfillmentRequest;
 import com.novacart.order.entity.Order;
 import com.novacart.order.service.OrderService;
 import jakarta.validation.Valid;
@@ -50,6 +51,18 @@ public class OrderController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
         return ResponseEntity.ok(orderService.getOrdersForSeller(sellerId, PageRequest.of(page, size)));
+    }
+
+    @PatchMapping("/seller/{orderId}/fulfillment")
+    public ResponseEntity<Order> updateSellerFulfillment(
+            @RequestHeader("X-User-Id") String sellerId,
+            @RequestHeader(value = "X-User-Roles", required = false) String roles,
+            @PathVariable String orderId,
+            @Valid @RequestBody UpdateFulfillmentRequest request) {
+        if (roles == null || !roles.contains("ROLE_SELLER")) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        return ResponseEntity.ok(orderService.updateSellerFulfillment(orderId, sellerId, request.status()));
     }
 
     @PostMapping("/{orderId}/cancel")

@@ -11,6 +11,17 @@ export interface Payment {
   failureReason?: string
 }
 
+export interface CouponQuote {
+  code: string
+  discountPaise: number
+  finalAmountPaise: number
+}
+
+export async function applyCoupon(code: string, orderAmountPaise: number): Promise<CouponQuote> {
+  const response = await apiClient.post<CouponQuote>('/payments/coupons/apply', { code, orderAmountPaise })
+  return response.data
+}
+
 export async function processPayment(orderId: string, userId: string, amountPaise: number): Promise<Payment> {
   const response = await apiClient.post<Payment>('/payments/process', {
     orderId,

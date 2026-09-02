@@ -1,6 +1,6 @@
 import { apiClient } from '../lib/api-client'
 import type { DeliveryAddress } from '../stores/checkout-store'
-import type { Order } from '../types/saga'
+import type { FulfillmentStatus, Order } from '../types/saga'
 
 export interface CreateOrderPayload {
   userId: string
@@ -27,6 +27,11 @@ export async function getOrders(page = 0, size = 20) {
 
 export async function getSellerOrders(page = 0, size = 20) {
   const response = await apiClient.get<{ content: Order[]; totalElements: number; totalPages: number }>('/orders/seller', { params: { page, size } })
+  return response.data
+}
+
+export async function updateSellerFulfillment(orderId: string, status: Extract<FulfillmentStatus, 'SHIPPED' | 'DELIVERED'>): Promise<Order> {
+  const response = await apiClient.patch<Order>(`/orders/seller/${encodeURIComponent(orderId)}/fulfillment`, { status })
   return response.data
 }
 

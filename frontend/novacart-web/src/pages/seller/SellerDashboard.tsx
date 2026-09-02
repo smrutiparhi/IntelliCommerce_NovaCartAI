@@ -5,7 +5,7 @@ import { type FormEvent, useMemo, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { createProduct, deleteProduct, getSellerProducts, updateProduct, type ProductApiModel, type ProductWritePayload } from '../../api/products'
 import { getInventory, setInventory } from '../../api/inventory'
-import { getSellerOrders } from '../../api/orders'
+import { getSellerOrders, updateSellerFulfillment } from '../../api/orders'
 import { useAuthStore } from '../../stores/auth-store'
 import { SellerOrdersPanel } from '../../components/seller/SellerOrdersPanel'
 
@@ -40,6 +40,7 @@ export function SellerDashboardPage() {
   })
   const remove = useMutation({ mutationFn: deleteProduct, onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ['seller-products'] }); setNotice('Product removed from the storefront.') } })
   const stockUpdate = useMutation({ mutationFn: ({ productId, quantity }: { productId: string; quantity: number }) => setInventory(productId, quantity), onSuccess: () => queryClient.invalidateQueries({ queryKey: ['seller-inventory'] }) })
+  const fulfillmentUpdate = useMutation({ mutationFn: ({ orderId, status }: { orderId: string; status: 'SHIPPED' | 'DELIVERED' }) => updateSellerFulfillment(orderId, status), onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ['seller-orders'] }); setNotice('Fulfilment status updated.') } })
 
   if (!user?.roles.includes('ROLE_SELLER') && !user?.roles.includes('ROLE_ADMIN')) return <Navigate to="/home" replace />
   const openCreate = () => { setEditing(null); setForm(emptyForm); setEditorOpen(true); setNotice('') }
@@ -48,7 +49,7 @@ export function SellerDashboardPage() {
 
   return <main className="min-h-[75vh] bg-[var(--nc-bg)] px-5 py-10 text-[var(--nc-text)] sm:px-8 lg:py-14"><div className="mx-auto max-w-shell">
     <section className="relative overflow-hidden rounded-[2.25rem] bg-slate-950 px-6 py-8 text-white sm:px-9 sm:py-10"><div className="absolute -right-20 -top-24 h-72 w-72 rounded-full bg-violet-600/25 blur-3xl" /><div className="relative flex flex-col justify-between gap-7 lg:flex-row lg:items-end"><div><p className="text-xs font-black uppercase tracking-[.18em] text-[#dfff36]">Seller studio</p><h1 className="mt-3 text-4xl font-black tracking-[-.055em] sm:text-5xl">Your store, in motion.</h1><p className="mt-4 max-w-xl text-sm leading-6 text-slate-400">Publish products, manage live inventory, and follow every order from one focused workspace.</p></div><button onClick={openCreate} className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-[#dfff36] px-6 text-sm font-black text-slate-950 transition hover:-translate-y-0.5"><Plus className="h-4 w-4" /> Add product</button></div></section>
-    <SellerOrdersPanel orders={orders.data?.content ?? []} sellerId={user.id} loading={orders.isLoading} />
+    <SellerOrdersPanel orders={orders.data?.content ?? []} sellerId={user.id} loading={orders.isLoading} updatingOrderId={fulfillmentUpdate.isPending ? fulfillmentUpdate.variables?.orderId : undefined} onUpdate={(orderId, status) => fulfillmentUpdate.mutate({ orderId, status })} />
     {notice && <div className="mt-5 flex items-center gap-2 rounded-2xl border border-emerald-300/40 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-400/[.07] dark:text-emerald-300"><CheckCircle2 className="h-4 w-4" />{notice}</div>}
     <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{[
       { label: 'Live products', value: products.length, icon: Package },

@@ -14,7 +14,7 @@ describe('checkout store', () => {
   it('keeps the delivery address but clears transient order data after checkout', () => {
     const address = { fullName: 'Smruti Parhi', phone: '9999999999', line1: 'Test Road', city: 'Bhubaneswar', state: 'Odisha', postalCode: '751001' }
     useCheckoutStore.getState().setAddress(address)
-    useCheckoutStore.getState().setIdempotencyKey('key-1')
+    useCheckoutStore.getState().setIdempotencyKey('key-1', 'product-1:1:999')
     useCheckoutStore.getState().setActiveOrder(order)
 
     useCheckoutStore.getState().finishCheckout()
