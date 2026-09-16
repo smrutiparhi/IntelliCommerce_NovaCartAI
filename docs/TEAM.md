@@ -26,23 +26,23 @@ Cross-references CLAUDE.md's 25-phase table against the slice ownership above. U
 | 5 | Frontend shell | Member 1 | Done |
 | 6 | Infrastructure trio (Eureka/Config/Gateway) | Member 1 | Done |
 | 7 | Auth service | Member 1 | Done |
-| 8 | Product service | Member 2 | Not started |
-| 9 | Inventory service | Member 3 | Not started |
-| 10 | Cart service | Member 2 | Not started |
-| 11 | Order service | Member 3 | Not started |
-| 12 | Payment service | Member 3 | Not started |
-| 13 | Kafka + full saga | Member 3 | Not started |
+| 8 | Product service | Member 2 | Done |
+| 9 | Inventory service | Member 3 | Done |
+| 10 | Cart service | Member 2 | Done |
+| 11 | Order service | Member 3 | Done |
+| 12 | Payment service | Member 3 | Done |
+| 13 | Kafka + full saga | Member 3 | Done |
 | 14 | Notification service | Member 3 | Deferred (logged-stub only, see DEFERRED.md) |
 | 15 | Analytics service | Member 4 | Deferred (Tier 3, see DEFERRED.md) |
 | 16-17 | AI RAG + Agent | Member 4 | Not started |
-| 18 | Frontend completion | Each member, their own slice's pages | Not started |
-| 19 | Docker | Member 1 (DevOps) | Not started |
+| 18 | Frontend completion | Each member, their own slice's pages | Done for commerce flows |
+| 19 | Docker | Member 1 (DevOps) | In progress |
 | 20 | CI/CD | Member 1 (DevOps) | Reduced scope |
 | 21 | Cloud deployment | Member 1 (DevOps) | Deferred |
 | 22 | Testing sweep | Each member, their own slice | Reduced scope |
 | 23 | Documentation | Shared, ongoing | Ongoing |
 | 24 | Performance | Shared | Deferred |
-| 25 | Final review | Shared (all 4) | Not started |
+| 25 | Final review | Shared (all 4) | In progress |
 
 ---
 
