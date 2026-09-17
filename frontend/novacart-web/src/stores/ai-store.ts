@@ -33,7 +33,7 @@ interface AIState {
 export const useAIStore = create<AIState>((set, get) => ({
   searchQuery: '',
   selectedBrand: null,
-  isPanelOpen: true,
+  isPanelOpen: false,
   isUploadModalOpen: false,
   isGenerating: false,
   uploadedImage: null,

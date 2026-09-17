@@ -7,3 +7,7 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv
 }
+
+interface Window {
+  Razorpay?: new (options: Record<string, unknown>) => { open: () => void }
+}

@@ -8,7 +8,7 @@ type BrandLogoProps = {
 
 export function BrandLogo({ className = '', imageClassName = '', compact = false }: BrandLogoProps) {
   return (
-    <Link to="/" aria-label="NovaCart home" className={`group inline-flex shrink-0 items-center ${className}`}>
+    <Link to="/" aria-label="NovaCart home" className={`nc-brand group inline-flex shrink-0 items-center ${className}`}>
       <img
         src="/novacart-logo-transparent.png"
         alt="NovaCart"

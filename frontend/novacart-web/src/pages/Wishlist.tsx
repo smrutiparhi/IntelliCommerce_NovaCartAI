@@ -1,25 +1,18 @@
-import { ArrowRight, Heart, PackageOpen, ShoppingBag, Sparkles, Trash2 } from 'lucide-react'
+import { ArrowUpRight, Heart } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { PRODUCTS } from '../data/store-products'
 import { useCommerceStore } from '../stores/commerce-store'
+import { useAvailability, useCatalogue } from '../hooks/useCatalogue'
+import { ProductCard } from '../components/store/ProductCardGrid'
 
 export function WishlistPage() {
   const wishlist = useCommerceStore((state) => state.wishlist)
-  const removeFromWishlist = useCommerceStore((state) => state.removeFromWishlist)
-  const addToCart = useCommerceStore((state) => state.addToCart)
-  const cart = useCommerceStore((state) => state.cart)
-  const products = wishlist.flatMap((id) => {
-    const product = PRODUCTS.find((item) => item.id === id)
-    return product ? [product] : []
-  })
-
-  return (
-    <main className="min-h-[70vh] bg-[var(--nc-bg)] px-5 py-10 text-[var(--nc-text)] sm:px-8 lg:py-14">
-      <div className="mx-auto max-w-[1380px]">
-        <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end"><div><p className="nc-label">Saved for later</p><h1 className="mt-3 text-h1">Your wishlist</h1><p className="mt-4 max-w-xl text-base leading-7 text-slate-500">Keep everything you love in one place and move it to your cart whenever you are ready.</p></div><div className="inline-flex w-fit items-center gap-2 rounded-full border border-black/10 bg-black/[.035] px-4 py-2 text-sm font-bold dark:border-white/10 dark:bg-white/[.04]"><Heart className="h-4 w-4 text-rose-500" /> {products.length} saved</div></div>
-
-        {products.length === 0 ? <section className="relative mt-10 overflow-hidden rounded-[2rem] border border-black/10 bg-[var(--nc-surface)] px-6 py-16 text-center shadow-card dark:border-white/10 sm:px-10 sm:py-24"><div className="absolute -left-20 -top-20 h-60 w-60 rounded-full bg-violet-200/40 blur-3xl dark:bg-[#dfff36]/[.04]" /><div className="relative mx-auto max-w-xl"><div className="mx-auto grid h-20 w-20 place-items-center rounded-[1.7rem] bg-slate-950 text-white shadow-xl"><PackageOpen className="h-8 w-8" /></div><p className="nc-label mt-7">Nothing saved yet</p><h2 className="mt-3 text-3xl font-black tracking-[-.04em] sm:text-4xl">Your favourites will live here.</h2><p className="mx-auto mt-4 max-w-md text-sm leading-6 text-slate-500">Tap the heart on any catalogue product to build your personal shortlist.</p><div className="mt-8 flex flex-wrap justify-center gap-3"><Link to="/categories" className="nc-primary">Explore products <ArrowRight className="h-4 w-4" /></Link><Link to="/ai-assistant" className="nc-secondary"><Sparkles className="h-4 w-4" /> Ask Nova</Link></div></div></section> : <section className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{products.map((product) => <article key={product.id} className="group flex flex-col overflow-hidden rounded-[1.7rem] border border-black/10 bg-[var(--nc-surface)] p-2 shadow-[0_14px_40px_rgba(20,18,14,.06)] dark:border-white/10"><div className="relative aspect-square overflow-hidden rounded-[1.3rem]"><Link to={`/products/${product.id}`}><img src={product.image} alt={product.title} className="h-full w-full object-cover transition duration-700 group-hover:scale-105" /></Link><button onClick={() => removeFromWishlist(product.id)} className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-white/90 text-rose-500 shadow-md transition hover:scale-105" aria-label={`Remove ${product.title} from wishlist`}><Trash2 className="h-4 w-4" /></button></div><div className="flex flex-1 flex-col p-4"><p className="nc-label">{product.brand}</p><Link to={`/products/${product.id}`} className="mt-2 line-clamp-2 text-sm font-bold hover:text-violet-600 dark:hover:text-[#dfff36]">{product.title}</Link><div className="mt-auto flex items-end justify-between gap-3 pt-5"><div><p className="text-lg font-black">₹{product.priceINR.toLocaleString('en-IN')}</p>{product.originalPriceINR && <p className="text-xs text-slate-500 line-through">₹{product.originalPriceINR.toLocaleString('en-IN')}</p>}</div><button onClick={() => addToCart(product.id)} className="grid h-11 w-11 place-items-center rounded-full bg-slate-950 text-white transition hover:bg-violet-600 dark:bg-[#dfff36] dark:text-[#101217]" aria-label={`Add ${product.title} to cart`}><ShoppingBag className={`h-4 w-4 ${cart[product.id] ? 'fill-current' : ''}`} /></button></div></div></article>)}</section>}
-      </div>
-    </main>
-  )
+  const remove = useCommerceStore((state) => state.removeFromWishlist)
+  const { data: catalogue, isLoading } = useCatalogue()
+  const { data: availability } = useAvailability()
+  const products = catalogue?.products.filter((product) => wishlist.includes(product.id)) ?? []
+  const unknown = wishlist.filter((id) => !products.some((p) => p.id === id))
+  return <div className="nc-shell nc-account-page py-12 min-h-[65vh]">
+    <header className="nc-section-head border-b pb-7"><div><p className="nc-label">A little collection of you</p><h1 className="text-h1 mt-4">Saved for a good day.</h1><p className="nc-muted mt-4 text-sm">All the things that caught your eye, in one happy place.</p></div><span className="nc-text-link nc-muted"><Heart size={15} /> {wishlist.length} saved</span></header>
+    {isLoading ? <p className="nc-muted py-12 text-sm">Finding your favourites…</p> : !wishlist.length ? <section className="nc-empty"><Heart size={30} /><h2 className="text-2xl font-semibold tracking-tight">Good things are worth keeping.</h2><p>Tap the heart on anything you love. We'll keep it here until you're ready.</p><Link to="/home" className="nc-primary mt-5">Find a favourite <ArrowUpRight size={15} /></Link></section> : <><section className="nc-products-grid">{products.map((product) => <ProductCard key={product.id} product={product} stock={availability?.[product.id]} />)}</section>{unknown.map((id) => <div className="mt-5 flex justify-between rounded-xl border p-5 text-xs" key={id}><p>Product details are currently unavailable.</p><button onClick={() => remove(id)}>Remove from wishlist</button></div>)}</>}
+  </div>
 }

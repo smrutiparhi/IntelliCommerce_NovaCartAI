@@ -5,11 +5,13 @@ export default {
   theme: {
     extend: {
       colors: {
-        primary: { 50: '#eef2ff', 100: '#e0e7ff', 200: '#c7d2fe', 300: '#a5b4fc', 400: '#818cf8', 500: '#6366f1', 600: '#5457e5', 700: '#4547c8', 800: '#3739a3', 900: '#30327f' },
-        ink: { 950: '#07080b', 900: '#0b0d12', 850: '#101218', 800: '#151821', 700: '#20242f' },
+        primary: { 50: '#f7f9ed', 100: '#edf2d9', 200: '#dbe6b4', 300: '#bed180', 400: '#9db655', 500: '#7b922f', 600: '#596d24', 700: '#465522', 800: '#39441f', 900: '#2e371c' },
+        violet: { 50: '#f7f9ed', 100: '#edf2d9', 200: '#dbe6b4', 300: '#bed180', 400: '#9db655', 500: '#7b922f', 600: '#596d24', 700: '#465522', 800: '#39441f', 900: '#2e371c' },
+        slate: { 50: '#f8f9f5', 100: '#eff1e9', 200: '#dfe3d7', 300: '#c5cbbc', 400: '#a2ab94', 500: '#78816d', 600: '#5e6854', 700: '#464f3e', 800: '#333b2e', 900: '#242c20', 950: '#181f15' },
+        ink: { 950: '#10120f', 900: '#141710', 850: '#191c17', 800: '#242820', 700: '#32392d' },
         accent: { 400: '#9da8ff', 500: '#7c87ff' },
         error: { 500: '#fb7185' },
-        dark: { bg: '#07080b', surface: '#101218', border: '#252a36' },
+        dark: { bg: '#10120f', surface: '#191c17', border: '#32392d' },
       },
       fontFamily: { sans: ['Inter Variable', 'Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'] },
       fontSize: {
@@ -27,7 +29,7 @@ export default {
       borderRadius: { '4xl': '2rem', '5xl': '2.5rem' },
       boxShadow: {
         float: '0 24px 80px rgba(0,0,0,.34)',
-        card: '0 18px 60px rgba(0,0,0,.22)',
+        card: 'var(--nc-shadow)',
         glow: '0 0 80px rgba(99,102,241,.16)',
       },
       maxWidth: { shell: '1440px', measure: '65ch' },

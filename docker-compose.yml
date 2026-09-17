@@ -341,6 +341,10 @@ services:
       SPRING_DATASOURCE_PASSWORD: novacart_password
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       EUREKA_URI: "http://eureka-server:8761/eureka/"
+      RAZORPAY_KEY_ID: "${RAZORPAY_KEY_ID:-rzp_test_mockKeyId12345}"
+      RAZORPAY_KEY_SECRET: "${RAZORPAY_KEY_SECRET:-mockKeySecret67890}"
+      RAZORPAY_WEBHOOK_SECRET: "${RAZORPAY_WEBHOOK_SECRET:-mockWebhookSecret13579}"
+      RAZORPAY_ALLOW_SIMULATION: "${RAZORPAY_ALLOW_SIMULATION:-true}"
     depends_on:
       api-gateway:
         condition: service_healthy

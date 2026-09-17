@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowLeft, ArrowRight, Check, ChevronDown, Heart, Minus, Plus, RotateCcw, ShieldCheck, ShoppingBag, Star, Truck } from 'lucide-react'
 import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useCommerceStore } from '../stores/commerce-store'
 import { useCatalogue, useProduct, useProductInventory } from '../hooks/useCatalogue'
 import { ReviewPanel } from '../components/product/ReviewPanel'
@@ -16,6 +16,7 @@ const imageViews = [
 
 export function ProductDetailsPage() {
   const { id } = useParams()
+  const navigate = useNavigate()
   const { data: productResult, isLoading } = useProduct(id)
   const { data: inventory } = useProductInventory(id)
   const { data: catalogue } = useCatalogue()
@@ -36,7 +37,7 @@ export function ProductDetailsPage() {
     return `Rated ${product.rating} out of 5 from ${product.reviewsCount} customer ratings.`
   }
 
-  if (isLoading) return <div className="min-h-[70vh] bg-[var(--nc-bg)] px-5 py-16 text-[var(--nc-text)]"><div className="nc-shell grid animate-pulse gap-10 lg:grid-cols-2"><div className="aspect-square rounded-[2.5rem] bg-black/[.06] dark:bg-white/[.05]" /><div className="space-y-5 pt-8"><div className="h-3 w-28 rounded-full bg-black/10 dark:bg-white/10" /><div className="h-20 max-w-lg rounded-2xl bg-black/[.06] dark:bg-white/[.05]" /><div className="h-12 w-48 rounded-2xl bg-black/[.06] dark:bg-white/[.05]" /></div></div></div>
+  if (isLoading) return <div className="nc-account-page min-h-[70vh] bg-[var(--nc-bg)] px-5 py-16 text-[var(--nc-text)]"><div className="nc-shell grid animate-pulse gap-10 lg:grid-cols-2"><div className="aspect-square rounded-[1.5rem] bg-black/[.06] dark:bg-white/[.05]" /><div className="space-y-5 pt-8"><div className="h-3 w-28 rounded-full bg-black/10 dark:bg-white/10" /><div className="h-20 max-w-lg rounded-2xl bg-black/[.06] dark:bg-white/[.05]" /><div className="h-12 w-48 rounded-2xl bg-black/[.06] dark:bg-white/[.05]" /></div></div></div>
   if (!product) return <div className="flex min-h-[70vh] items-center bg-[var(--nc-bg)] px-5 py-20 text-center text-[var(--nc-text)]"><div className="mx-auto max-w-lg"><p className="nc-label">Product unavailable</p><h1 className="mt-5 text-h2">We could not find that product.</h1><p className="mt-5 text-sm leading-7 text-slate-500">The link may be outdated. Explore the current NovaCart catalogue to find something nearby.</p><Link to="/search" className="nc-primary mt-8"><ArrowLeft className="h-4 w-4" /> Browse products</Link></div></div>
 
   const discount = product.originalPriceINR ? Math.round((1 - product.priceINR / product.originalPriceINR) * 100) : 0
@@ -44,13 +45,13 @@ export function ProductDetailsPage() {
   const stock = inventory ? Math.max(0, inventory.availableQuantity - inventory.reservedQuantity) : undefined
 
   return (
-    <main className="min-h-screen bg-[var(--nc-bg)] py-8 text-[var(--nc-text)] lg:py-12">
+    <main className="nc-account-page nc-commerce-page min-h-screen bg-[var(--nc-bg)] py-8 text-[var(--nc-text)] lg:py-12">
       <div className="nc-shell">
         <Link to="/search" className="mb-8 inline-flex items-center gap-2 text-xs font-semibold text-slate-500 transition hover:text-slate-950 dark:hover:text-white"><ArrowLeft className="h-4 w-4" /> Back to discovery</Link>
 
         <div className="grid gap-10 lg:grid-cols-[1.08fr_.92fr] xl:gap-16">
           <section>
-            <div className="group relative aspect-square overflow-hidden rounded-[2.5rem] border border-black/10 bg-[var(--nc-surface)] shadow-[0_24px_80px_rgba(34,30,22,.08)] dark:border-white/10 dark:shadow-float">
+            <div className="group relative aspect-square overflow-hidden rounded-[1.5rem] border border-black/10 bg-[var(--nc-surface)] shadow-[0_24px_80px_rgba(34,30,22,.08)] dark:border-white/10 dark:shadow-float">
               <AnimatePresence mode="wait">
                 <motion.img key={activeImage} src={product.image} alt={product.title} onError={(event) => replaceBrokenProductImage(event, product.title, product.brand)} initial={{ opacity: 0, scale: .98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={{ duration: .3 }} className={`h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.025] ${imageViews[activeImage].scale}`} style={{ objectPosition: imageViews[activeImage].position }} />
               </AnimatePresence>
@@ -74,10 +75,10 @@ export function ProductDetailsPage() {
               {[{ icon: Truck, title: 'Fast delivery', copy: product.delivery ?? 'At checkout' }, { icon: RotateCcw, title: 'Easy returns', copy: 'Within 7 days' }, { icon: ShieldCheck, title: 'Secure payment', copy: 'Protected checkout' }].map(({ icon: Icon, title, copy }) => <div key={title} className="rounded-2xl border border-black/10 bg-[var(--nc-surface)] p-4 dark:border-white/10"><Icon className="h-4 w-4 text-violet-600 dark:text-[#dfff36]" /><p className="mt-3 text-xs font-bold">{title}</p><p className="mt-1 text-[10px] leading-4 text-slate-500">{copy}</p></div>)}
             </div>
 
-            <div className="mt-8 flex items-center justify-between border-y border-black/10 py-5 dark:border-white/10"><span className="text-xs font-semibold text-slate-500">Quantity</span><div className="flex items-center rounded-full border border-black/10 bg-black/[.035] p-1 dark:border-white/10 dark:bg-white/[.04]"><button onClick={() => setQuantity((value) => Math.max(1, value - 1))} className="grid h-9 w-9 place-items-center rounded-full transition hover:bg-black/[.07] dark:hover:bg-white/10" aria-label="Decrease quantity"><Minus className="h-4 w-4" /></button><span className="w-9 text-center text-xs font-bold">{quantity}</span><button onClick={() => setQuantity((value) => Math.min(10, value + 1))} className="grid h-9 w-9 place-items-center rounded-full transition hover:bg-black/[.07] dark:hover:bg-white/10" aria-label="Increase quantity"><Plus className="h-4 w-4" /></button></div></div>
+            <div className="mt-8 flex items-center justify-between border-y border-black/10 py-5 dark:border-white/10"><span className="text-xs font-semibold text-slate-500">Quantity</span><div className="flex items-center rounded-full border border-black/10 bg-black/[.035] p-1 dark:border-white/10 dark:bg-white/[.04]"><button onClick={() => setQuantity((value) => Math.max(1, value - 1))} className="grid h-9 w-9 place-items-center rounded-full transition hover:bg-black/[.07] dark:hover:bg-white/10" aria-label="Decrease quantity"><Minus className="h-4 w-4" /></button><span className="w-9 text-center text-xs font-bold">{quantity}</span><button onClick={() => setQuantity((value) => Math.min(Math.max(1, Math.min(10 - cartQuantity, stock === undefined ? 10 : stock - cartQuantity)), value + 1))} className="grid h-9 w-9 place-items-center rounded-full transition hover:bg-black/[.07] dark:hover:bg-white/10" aria-label="Increase quantity"><Plus className="h-4 w-4" /></button></div></div>
 
-            <div className="mt-6 grid gap-3 sm:grid-cols-[1fr_auto]"><button onClick={() => addToCart(product.id, quantity)} className="nc-primary">{cartQuantity > 0 ? <><Check className="h-4 w-4" /> {cartQuantity} in cart</> : <><ShoppingBag className="h-4 w-4" /> Add {quantity} to cart</>}</button><button onClick={() => toggleWishlist(product.id)} aria-pressed={saved} className="nc-secondary px-5"><Heart className={`h-4 w-4 ${saved ? 'fill-current text-rose-500' : ''}`} /> {saved ? 'Saved' : 'Save'}</button></div>
-            <Link to="/checkout" className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-slate-950 text-sm font-bold text-white transition hover:bg-violet-700 dark:bg-white dark:text-[#101217] dark:hover:bg-[#dfff36]">Buy now <ArrowRight className="h-4 w-4" /></Link>
+            <div className="mt-6 grid gap-3 sm:grid-cols-[1fr_auto]"><button disabled={stock === 0 || cartQuantity >= 10 || (stock !== undefined && cartQuantity >= stock)} onClick={() => addToCart(product.id, Math.min(quantity, 10 - cartQuantity, stock === undefined ? 10 : stock - cartQuantity))} className="nc-primary">{stock === 0 ? 'Sold out' : cartQuantity > 0 ? <><Check className="h-4 w-4" /> {cartQuantity} in cart</> : <><ShoppingBag className="h-4 w-4" /> Add {quantity} to cart</>}</button><button onClick={() => toggleWishlist(product.id)} aria-pressed={saved} className="nc-secondary px-5"><Heart className={`h-4 w-4 ${saved ? 'fill-current text-rose-500' : ''}`} /> {saved ? 'Saved' : 'Save'}</button></div>
+            <button disabled={stock === 0} onClick={() => { if (cartQuantity === 0) addToCart(product.id, Math.min(quantity, stock ?? 10)); navigate('/checkout') }} className="nc-secondary mt-3 flex w-full items-center justify-center gap-2">Buy now <ArrowRight className="h-4 w-4" /></button>
 
             <div className="mt-8 divide-y divide-black/10 border-y border-black/10 dark:divide-white/10 dark:border-white/10">{details.map((detail) => <div key={detail}><button onClick={() => setOpenDetail(openDetail === detail ? '' : detail)} aria-expanded={openDetail === detail} className="flex w-full items-center justify-between py-5 text-left text-sm font-semibold"><span>{detail}</span><ChevronDown className={`h-4 w-4 text-slate-500 transition ${openDetail === detail ? 'rotate-180' : ''}`} /></button><AnimatePresence initial={false}>{openDetail === detail && <motion.p initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden pb-5 text-sm leading-7 text-slate-500">{detailCopy(detail)}</motion.p>}</AnimatePresence></div>)}</div>
           </section>

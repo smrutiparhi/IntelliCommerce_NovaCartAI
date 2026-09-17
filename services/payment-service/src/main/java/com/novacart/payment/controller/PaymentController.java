@@ -29,6 +29,11 @@ public class PaymentController {
         return ResponseEntity.ok(processed);
     }
 
+    @GetMapping("/config")
+    public ResponseEntity<Map<String, Object>> getRazorpayConfig() {
+        return ResponseEntity.ok(Map.of("keyId", paymentService.getRazorpayKeyId(), "live", paymentService.isLiveRazorpayConfigured()));
+    }
+
     @PostMapping("/webhook")
     public ResponseEntity<String> handleRazorpayWebhook(
             @RequestBody String rawPayload,

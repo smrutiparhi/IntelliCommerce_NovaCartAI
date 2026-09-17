@@ -14,6 +14,7 @@ interface CommerceState {
   toggleWishlist: (productId: string) => void
   removeFromWishlist: (productId: string) => void
   hydrateFromServer: () => Promise<void>
+  pruneUnknownProducts: (productIds: string[]) => void
 }
 
 const hasSession = () => useAuthStore.getState().isAuthenticated
@@ -72,6 +73,11 @@ export const useCommerceStore = create<CommerceState>()(
           // Redis or the backend may be offline during local frontend development.
           // The persisted browser cart remains usable and will retry after reload.
         }
+      },
+      pruneUnknownProducts: (productIds) => {
+        const validIds = new Set(productIds)
+        const entries = Object.entries(get().cart)
+        if (entries.some(([id]) => !validIds.has(id))) set({ cart: Object.fromEntries(entries.filter(([id]) => validIds.has(id))) })
       },
     }),
     { name: 'novacart-commerce', partialize: (state) => ({ cart: state.cart, wishlist: state.wishlist, syncedUserId: state.syncedUserId }) },

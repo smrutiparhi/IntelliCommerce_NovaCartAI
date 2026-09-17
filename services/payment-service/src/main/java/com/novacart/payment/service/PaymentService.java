@@ -19,6 +19,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -36,6 +43,12 @@ public class PaymentService {
     @Value("${razorpay.key-secret:mockKeySecret67890}")
     private String razorpaySecret;
 
+    @Value("${razorpay.key-id:rzp_test_mockKeyId12345}")
+    private String razorpayKeyId;
+
+    @Value("${razorpay.allow-simulation:true}")
+    private boolean allowSimulation;
+
     @Value("${razorpay.webhook-secret:mockWebhookSecret13579}")
     private String webhookSecret;
 
@@ -46,7 +59,7 @@ public class PaymentService {
             return existingOpt.get();
         }
 
-        String razorpayOrderId = "order_rzp_" + UUID.randomUUID().toString().substring(0, 8);
+        String razorpayOrderId = createRazorpayOrder(orderId, amountPaise, currency);
 
         Payment payment = Payment.builder()
             .orderId(orderId)
@@ -78,8 +91,9 @@ public class PaymentService {
             String payload = payment.getRazorpayOrderId() + "|" + request.razorpayPaymentId();
             isSignatureValid = RazorpaySignatureUtils.verifySignature(payload, request.razorpaySignature(), razorpaySecret);
         } else {
-            // Simulated payment when no signature provided
-            isSignatureValid = !request.shouldFail();
+            // Only permit the local mock flow when explicitly configured. Live mode
+            // always requires Razorpay's signed checkout response.
+            isSignatureValid = allowSimulation && isMockConfiguration() && !request.shouldFail();
         }
 
         if (request.shouldFail() || !isSignatureValid) {
@@ -124,23 +138,116 @@ public class PaymentService {
             return false;
         }
 
-        log.info("Razorpay Webhook signature verified successfully!");
-        // Process webhook payload...
-        return true;
+        try {
+            var root = objectMapper.readTree(rawPayload);
+            String event = root.path("event").asText("");
+            var entity = root.path("payload").path("payment").path("entity");
+            String razorpayOrderId = entity.path("order_id").asText("");
+            String razorpayPaymentId = entity.path("id").asText("");
+            if (razorpayOrderId.isBlank()) {
+                log.info("Ignoring verified Razorpay webhook without an order id: {}", event);
+                return true;
+            }
+            Optional<Payment> paymentOpt = paymentRepository.findByRazorpayOrderId(razorpayOrderId);
+            if (paymentOpt.isEmpty()) return true;
+            Payment payment = paymentOpt.get();
+            // Webhooks are retried by Razorpay; applying a terminal state twice is safe.
+            if ("payment.captured".equals(event) || "order.paid".equals(event)) {
+                if (payment.getStatus() != PaymentStatus.REFUNDED) payment.setStatus(PaymentStatus.CAPTURED);
+                if (!razorpayPaymentId.isBlank()) payment.setRazorpayPaymentId(razorpayPaymentId);
+                payment.setSignatureVerified(true);
+                payment.setWebhookVerifiedAt(Instant.now());
+                paymentRepository.save(payment);
+            } else if ("payment.failed".equals(event) && payment.getStatus() != PaymentStatus.CAPTURED && payment.getStatus() != PaymentStatus.REFUNDED) {
+                payment.setStatus(PaymentStatus.FAILED);
+                payment.setFailureReason(entity.path("error_description").asText("Razorpay payment failed"));
+                payment.setWebhookVerifiedAt(Instant.now());
+                paymentRepository.save(payment);
+            }
+            log.info("Razorpay webhook processed event={}, orderId={}", event, payment.getOrderId());
+            return true;
+        } catch (Exception ex) {
+            log.error("Verified Razorpay webhook payload was invalid", ex);
+            return false;
+        }
+    }
+
+    public String getRazorpayKeyId() { return razorpayKeyId; }
+
+    public boolean isLiveRazorpayConfigured() { return !isMockConfiguration(); }
+
+    private String createRazorpayOrder(String orderId, long amountPaise, String currency) {
+        if (isMockConfiguration()) {
+            if (!allowSimulation) throw new IllegalStateException("Razorpay credentials are not configured");
+            return "order_rzp_" + UUID.randomUUID().toString().substring(0, 8);
+        }
+        try {
+            String auth = Base64.getEncoder().encodeToString((razorpayKeyId + ":" + razorpaySecret).getBytes(StandardCharsets.UTF_8));
+            String body = objectMapper.writeValueAsString(Map.of("amount", amountPaise, "currency", currency == null || currency.isBlank() ? "INR" : currency, "receipt", orderId));
+            HttpRequest request = HttpRequest.newBuilder(URI.create("https://api.razorpay.com/v1/orders"))
+                .header("Authorization", "Basic " + auth).header("Content-Type", "application/json")
+                .timeout(java.time.Duration.ofSeconds(10)).POST(HttpRequest.BodyPublishers.ofString(body)).build();
+            HttpResponse<String> response = HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                log.error("Razorpay order creation failed status={} body={}", response.statusCode(), response.body());
+                throw new IllegalStateException("Razorpay order creation failed");
+            }
+            String id = objectMapper.readTree(response.body()).path("id").asText();
+            if (id.isBlank()) throw new IllegalStateException("Razorpay returned no order id");
+            return id;
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Razorpay order creation interrupted", ex);
+        } catch (Exception ex) {
+            throw new IllegalStateException("Razorpay order creation failed", ex);
+        }
+    }
+
+    private boolean isMockConfiguration() {
+        return razorpayKeyId == null || razorpayKeyId.isBlank() || razorpayKeyId.contains("mock") || razorpaySecret == null || razorpaySecret.isBlank() || razorpaySecret.contains("mock");
     }
 
     @Transactional
     public void refundCapturedPayment(String orderId, String reason) {
         paymentRepository.findByOrderId(orderId).ifPresent(payment -> {
             if (payment.getStatus() != PaymentStatus.CAPTURED) return;
+            if (!refundRepository.findByPaymentId(payment.getId()).isEmpty()) return;
+            String refundId = createRazorpayRefund(payment);
             refundRepository.save(Refund.builder()
                 .paymentId(payment.getId()).orderId(orderId).amountPaise(payment.getAmountPaise())
                 .reason(reason).status("PROCESSED")
-                .razorpayRefundId("rfnd_mock_" + UUID.randomUUID().toString().substring(0, 8)).build());
+                .razorpayRefundId(refundId).build());
             payment.setStatus(PaymentStatus.REFUNDED);
             paymentRepository.save(payment);
             log.info("Payment refunded for cancelled orderId={}", orderId);
         });
+    }
+
+    private String createRazorpayRefund(Payment payment) {
+        if (isMockConfiguration()) return "rfnd_mock_" + UUID.randomUUID().toString().substring(0, 8);
+        if (payment.getRazorpayPaymentId() == null || payment.getRazorpayPaymentId().isBlank()) {
+            throw new IllegalStateException("Cannot refund without a Razorpay payment id");
+        }
+        try {
+            String auth = Base64.getEncoder().encodeToString((razorpayKeyId + ":" + razorpaySecret).getBytes(StandardCharsets.UTF_8));
+            String body = objectMapper.writeValueAsString(Map.of("amount", payment.getAmountPaise()));
+            HttpRequest request = HttpRequest.newBuilder(URI.create("https://api.razorpay.com/v1/payments/" + payment.getRazorpayPaymentId() + "/refund"))
+                .header("Authorization", "Basic " + auth).header("Content-Type", "application/json")
+                .timeout(java.time.Duration.ofSeconds(10)).POST(HttpRequest.BodyPublishers.ofString(body)).build();
+            HttpResponse<String> response = HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                log.error("Razorpay refund failed status={} body={}", response.statusCode(), response.body());
+                throw new IllegalStateException("Razorpay refund failed");
+            }
+            String id = objectMapper.readTree(response.body()).path("id").asText();
+            if (id.isBlank()) throw new IllegalStateException("Razorpay returned no refund id");
+            return id;
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Razorpay refund interrupted", ex);
+        } catch (Exception ex) {
+            throw new IllegalStateException("Razorpay refund failed", ex);
+        }
     }
 
     public long calculateDiscount(ApplyCouponRequest request) {

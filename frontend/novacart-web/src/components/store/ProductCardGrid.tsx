@@ -1,185 +1,81 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
-import { Eye, Heart, ShoppingBag, Star, Sparkles } from 'lucide-react'
+import { motion, useReducedMotion } from 'framer-motion'
+import { ArrowDown, Check, Eye, Heart, Plus, Search, SlidersHorizontal, Star } from 'lucide-react'
 import type { StoreProduct } from '../../data/store-products'
 import { useAIStore } from '../../stores/ai-store'
 import { useCommerceStore } from '../../stores/commerce-store'
 import { replaceBrokenProductImage } from '../../lib/product-image'
 import { QuickViewModal } from '../product/QuickViewModal'
-import { BrandFilterBar } from './BrandFilterBar'
 import { useAvailability, useCatalogue } from '../../hooks/useCatalogue'
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.05,
-    },
-  },
-}
-
-const cardVariants = {
-  hidden: { opacity: 0, y: 16, scale: 0.98 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: { duration: 0.3, ease: 'easeOut' as const },
-  },
-}
+const categories = ['All finds', 'Technology', 'Audio', 'Fashion', 'Home', 'Beauty']
+type Sort = 'featured' | 'price-low' | 'price-high' | 'rating'
 
 export function ProductCardGrid({ query }: { query?: string } = {}) {
-  const { searchQuery, selectedBrand } = useAIStore()
+  const { searchQuery, selectedBrand, setSelectedBrand } = useAIStore()
   const { data: catalogue, isLoading } = useCatalogue()
   const { data: availability } = useAvailability()
-  const products = catalogue?.products ?? []
+  const [category, setCategory] = useState('All finds')
+  const [sort, setSort] = useState<Sort>('featured')
+  const [visibleCount, setVisibleCount] = useState(12)
   const effectiveQuery = query ?? searchQuery
   const effectiveBrand = query === undefined ? selectedBrand : null
-
-  // Filter products based on search query or selected brand
-  const filteredProducts = products.filter((p) => {
+  const brands = useMemo(() => [...new Set(catalogue?.products.map((p) => p.brand) ?? [])].sort(), [catalogue])
+  useEffect(() => { setVisibleCount(12) }, [effectiveQuery, effectiveBrand, category, sort])
+  const products = (catalogue?.products ?? []).filter((p) => {
     if (effectiveBrand && p.brand !== effectiveBrand) return false
-
+    if (category !== 'All finds' && p.category !== category) return false
     if (!effectiveQuery) return true
     const q = effectiveQuery.toLowerCase()
-    if (q === 'deals') return Boolean(p.originalPriceINR)
+    if (q === 'deals') return Boolean(p.originalPriceINR && p.originalPriceINR > p.priceINR)
     if (q === 'trending') return ['trending', 'bestseller', 'popular'].some((label) => p.badge?.toLowerCase().includes(label))
     if (q === 'new') return p.badge?.toLowerCase().includes('new') ?? false
     const haystack = [p.title, p.brand, p.category, p.badge ?? '', ...p.tags].join(' ').toLowerCase()
     const terms = q.split(/\s+/).filter((term) => term.length > 2)
-
     return haystack.includes(q) || terms.some((term) => haystack.includes(term))
-  })
+  }).sort((a,b) => sort === 'price-low' ? a.priceINR - b.priceINR : sort === 'price-high' ? b.priceINR - a.priceINR : sort === 'rating' ? b.rating - a.rating : 0)
 
-  return (
-    <div className="space-y-4">
-      {/* Store Header & Result count */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <h2 className="text-3xl font-semibold tracking-[-.04em] text-slate-950 dark:text-white">Live catalogue</h2>
-          <span className="text-body-sm font-semibold text-slate-600 dark:text-slate-300">{isLoading ? 'Loading…' : `${filteredProducts.length} products`}</span>
-          {catalogue?.source === 'api' && <span className="hidden rounded-full bg-emerald-100 px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300 sm:inline-flex">Live API</span>}
-          {effectiveQuery && (
-            <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-primary-100 px-2.5 py-0.5 text-xs font-medium text-primary-800 dark:bg-primary-900/50 dark:text-primary-200">
-              <Sparkles className="h-3 w-3" /> "{effectiveQuery}"
-            </span>
-          )}
-        </div>
-      </div>
-      {query === undefined && <BrandFilterBar />}
-
-      {/* Grid of cards */}
-      <motion.div
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-        key={effectiveQuery + (effectiveBrand || '')}
-        className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3"
-      >
-        <AnimatePresence mode="popLayout">
-          {filteredProducts.map((product) => (
-            <ProductCard key={product.id} product={product} stock={availability?.[product.id]} />
-          ))}
-        </AnimatePresence>
-      </motion.div>
-
-      {filteredProducts.length === 0 && (
-        <div className="flex min-h-[340px] flex-col items-center justify-center rounded-[2rem] border border-dashed border-white/15 bg-white/[.02] p-10 text-center">
-          <span className="mb-5 grid h-14 w-14 place-items-center rounded-2xl border border-white/10 bg-white/[.04]"><Sparkles className="h-5 w-5 text-indigo-300" /></span>
-          <p className="text-body-lg font-semibold text-slate-950 dark:text-white">No exact match yet.</p>
-          <p className="mt-2 max-w-sm text-body-sm text-slate-500">
-            Try a category, product type, or brand—such as audio, sneakers, coffee, or Nova Labs.
-          </p>
-        </div>
-      )}
+  return <div>
+    <div className="nc-catalogue-toolbar">
+      <div className="nc-filter-pills" role="group" aria-label="Filter by category">{categories.map((value) => <button key={value} onClick={() => setCategory(value)} aria-pressed={category === value}>{value}</button>)}</div>
+      <label className="nc-sort"><SlidersHorizontal size={13} /><span className="sr-only">Sort products</span><select aria-label="Sort products" value={sort} onChange={(event) => setSort(event.target.value as Sort)}><option value="featured">Featured first</option><option value="price-low">Price: low to high</option><option value="price-high">Price: high to low</option><option value="rating">Top rated</option></select></label>
     </div>
-  )
+    <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+      <p className="nc-muted text-[10px]" aria-live="polite">{isLoading ? 'Finding the good stuff…' : `${products.length} finds${effectiveQuery ? ` for “${effectiveQuery}”` : ' for your everyday'}`}</p>
+      {query === undefined && <label className="nc-sort"><span>Brand</span><select aria-label="Filter by brand" value={effectiveBrand ?? ''} onChange={(event) => setSelectedBrand(event.target.value || null)}><option value="">All brands</option>{brands.map((brand) => <option key={brand}>{brand}</option>)}</select></label>}
+    </div>
+    {isLoading ? <div className="nc-products-grid" aria-label="Loading products" aria-busy="true">{Array.from({length: 8}, (_, i) => <div key={i} className="animate-pulse"><div className="nc-product-image" /><div className="mt-4 h-3 w-3/4 rounded bg-[var(--nc-surface-raised)]" /><div className="mt-3 h-3 w-1/2 rounded bg-[var(--nc-surface-raised)]" /></div>)}</div>
+      : products.length === 0 ? <div className="nc-empty"><Search size={28} /><h3 className="text-xl font-semibold tracking-tight">Let's try another direction.</h3><p>No products match these filters. Try a different category, brand, or search.</p><button onClick={() => { setCategory('All finds'); setSelectedBrand(null) }} className="nc-secondary mt-3">Clear filters</button></div>
+      : <div className="nc-products-grid">{products.slice(0,visibleCount).map((product, i) => <ProductCard key={product.id} product={product} stock={availability?.[product.id]} index={i % 12} />)}</div>}
+    {products.length > visibleCount && <div className="mt-10 text-center"><button className="nc-secondary" onClick={() => setVisibleCount((count) => count + 12)}>A few more good finds <ArrowDown size={14} /></button><p className="nc-muted mt-3 text-[10px]">{visibleCount} of {products.length} products</p></div>}
+  </div>
 }
 
-function ProductCard({ product, stock }: { product: StoreProduct; stock?: number }) {
+export function ProductCard({ product, stock, index = 0 }: { product: StoreProduct; stock?: number; index?: number }) {
   const [quickViewOpen, setQuickViewOpen] = useState(false)
+  const reduceMotion = useReducedMotion()
   const isSaved = useCommerceStore((state) => state.wishlist.includes(product.id))
   const cartQuantity = useCommerceStore((state) => state.cart[product.id] ?? 0)
   const toggleWishlist = useCommerceStore((state) => state.toggleWishlist)
   const addToCart = useCommerceStore((state) => state.addToCart)
+  const discount = product.originalPriceINR && product.originalPriceINR > product.priceINR ? Math.round((1-product.priceINR/product.originalPriceINR)*100) : 0
 
-  return (
-    <>
-    <motion.div
-      variants={cardVariants}
-      layout
-      whileHover={{ y: -4 }}
-      className="group relative flex flex-col overflow-hidden rounded-[1.5rem] border border-slate-900/10 bg-white p-2 shadow-[0_14px_40px_rgba(15,23,42,.06)] transition-all hover:shadow-xl dark:border-dark-border dark:bg-dark-surface"
-    >
-      {/* Product Image Container */}
-      <div className="relative aspect-[4/4.25] w-full overflow-hidden rounded-[1.15rem] bg-slate-100 dark:bg-dark-bg">
-        <img
-          src={product.image}
-          alt={product.title}
-          loading="lazy"
-          onError={(event) => replaceBrokenProductImage(event, product.title, product.brand)}
-          className="h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
-        />
-
-        {/* Brand badge top left */}
-        <div className="absolute left-3 top-3 flex items-center gap-1 rounded-full bg-white/90 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-slate-800 shadow-sm backdrop-blur dark:bg-dark-surface/90 dark:text-slate-200">
-          <span>{product.brand}</span>
-        </div>
-
-        {/* Favorite button top right */}
-        <button
-          type="button"
-          onClick={() => toggleWishlist(product.id)}
-          aria-label={isSaved ? `Remove ${product.title} from wishlist` : `Add ${product.title} to wishlist`}
-          aria-pressed={isSaved}
-          className={`absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 backdrop-blur transition hover:scale-105 ${isSaved ? 'text-rose-500' : 'text-slate-600'}`}
-        >
-          <Heart className={`h-4 w-4 ${isSaved ? 'fill-current' : ''}`} />
-        </button>
-
-        {product.badge && <span className="absolute bottom-3 left-3 rounded-full border border-white/15 bg-black/55 px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider text-white backdrop-blur group-hover:opacity-0">{product.badge}</span>}
-
-        {/* Quick Add overlay */}
-        <div className="absolute bottom-3 left-3 right-3 flex gap-2 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-within:opacity-100">
-          <button type="button" onClick={() => setQuickViewOpen(true)} className="grid h-10 w-10 place-items-center rounded-full bg-white text-slate-950 shadow-md" aria-label={`Quick view ${product.title}`}><Eye className="h-4 w-4" /></button>
-          <button
-            type="button"
-            onClick={() => stock !== 0 && addToCart(product.id)}
-            disabled={stock === 0}
-            aria-label={`Add ${product.title} to cart`}
-            className="flex flex-1 items-center justify-center gap-2 rounded-full bg-slate-950/95 py-2.5 text-xs font-bold text-white backdrop-blur transition-colors hover:bg-indigo-500 disabled:cursor-not-allowed disabled:bg-slate-500 shadow-md"
-          >
-            <ShoppingBag className="h-3.5 w-3.5" /> {stock === 0 ? 'Sold out' : cartQuantity > 0 ? `${cartQuantity} in cart` : 'Quick add'}
-          </button>
-        </div>
+  return <>
+    <motion.article className="nc-product-card" initial={reduceMotion ? false : {opacity: 0, y: 14}} whileInView={{opacity:1,y:0}} viewport={{once:true,amount:.08}} transition={{duration:.4,delay: Math.min(index*.025,.15)}}>
+      <div className="nc-product-image">
+        <Link to={`/products/${product.id}`} tabIndex={-1} aria-hidden="true"><img src={product.image} alt="" loading="lazy" onError={(event) => replaceBrokenProductImage(event,product.title,product.brand)} /></Link>
+        {(product.badge || discount > 0) && <span className="nc-product-badge">{product.badge || `${discount}% off`}</span>}
+        <button type="button" onClick={() => toggleWishlist(product.id)} aria-label={`${isSaved ? 'Remove' : 'Save'} ${product.title}${isSaved ? ' from wishlist' : ' to wishlist'}`} aria-pressed={isSaved} className="nc-heart"><Heart size={14} fill={isSaved ? 'currentColor' : 'none'} /></button>
+        <button type="button" className="nc-product-quick" onClick={() => setQuickViewOpen(true)} aria-label={`Quick view ${product.title}`}><Eye size={12} /> Quick look</button>
       </div>
-
-      {/* Details */}
-      <div className="flex flex-1 flex-col justify-between px-3 pb-3 pt-4">
-        <div>
-          <h3 className="line-clamp-2 text-body-sm font-semibold text-slate-800 dark:text-slate-100 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors"><Link to={`/products/${product.id}`}>{product.title}</Link></h3>
-
-          {/* Rating */}
-          <div className="mt-1.5 flex items-center gap-1">
-            <div className="flex items-center text-amber-400">
-              <Star className="h-3.5 w-3.5 fill-current" />
-            </div>
-            <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{product.rating}</span>
-            <span className="text-xs text-slate-400">({product.reviewsCount})</span>
-          </div>
-        </div>
-
-        {/* Price */}
-        <div className="mt-3 border-t border-slate-100 pt-2.5 dark:border-dark-border/60">
-          <div className="flex items-baseline gap-2"><span className="text-body font-bold text-slate-900 dark:text-white">₹{product.priceINR.toLocaleString('en-IN')}</span>{product.originalPriceINR && <span className="text-xs text-slate-500 line-through">₹{product.originalPriceINR.toLocaleString('en-IN')}</span>}</div>
-          {stock !== undefined && <p className={`mt-1 text-[10px] font-bold ${stock === 0 ? 'text-rose-500' : stock <= 5 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>{stock === 0 ? 'Currently sold out' : stock <= 5 ? `Only ${stock} left` : 'In stock'}</p>}
-          {product.delivery && <p className="mt-1 text-[10px] text-slate-500">{product.delivery}</p>}
-        </div>
+      <div className="nc-product-details">
+        <div className="nc-product-meta"><span className="truncate">{product.brand}</span><span className="nc-product-rating"><Star />{product.rating}<span className="hidden sm:inline">({product.reviewsCount})</span></span></div>
+        <h3 className="line-clamp-2"><Link to={`/products/${product.id}`}>{product.title}</Link></h3>
+        <div className="nc-product-bottom"><div className="nc-price">₹{product.priceINR.toLocaleString('en-IN')}{product.originalPriceINR && <span className="nc-old-price">₹{product.originalPriceINR.toLocaleString('en-IN')}</span>}</div><button type="button" className={`nc-add ${cartQuantity ? 'is-added' : ''}`} disabled={stock === 0 || cartQuantity >= 10} onClick={() => addToCart(product.id)} aria-label={`Add ${product.title} to cart`} title={stock === 0 ? 'Sold out' : cartQuantity ? `${cartQuantity} in your bag` : 'Add to bag'}>{cartQuantity ? <Check size={15} /> : <Plus size={16} />}</button></div>
+        <p className="nc-product-delivery" aria-live="polite">{stock === 0 ? 'Currently sold out' : cartQuantity ? `${cartQuantity} in your bag` : stock !== undefined && stock <= 5 ? `Only ${stock} left` : product.delivery ?? product.category}</p>
       </div>
-    </motion.div>
+    </motion.article>
     <QuickViewModal product={product} open={quickViewOpen} onClose={() => setQuickViewOpen(false)} />
-    </>
-  )
+  </>
 }

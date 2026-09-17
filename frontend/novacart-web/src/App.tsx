@@ -1,6 +1,7 @@
 import { createBrowserRouter, RouterProvider, Outlet } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { lazy, Suspense } from 'react'
+import { MotionConfig } from 'framer-motion'
 import { AppShell } from './components/layout/AppShell'
 import { AuthGuard } from './components/layout/AuthGuard'
 import { ThemeProvider } from './components/layout/ThemeProvider'
@@ -112,10 +113,10 @@ const router = createBrowserRouter([
 
 export default function App() {
   return (
-    <ThemeProvider>
+    <MotionConfig reducedMotion="user"><ThemeProvider>
       <QueryClientProvider client={queryClient}>
         <Suspense fallback={<RouteLoader />}><RouterProvider router={router} /></Suspense>
       </QueryClientProvider>
-    </ThemeProvider>
+    </ThemeProvider></MotionConfig>
   )
 }

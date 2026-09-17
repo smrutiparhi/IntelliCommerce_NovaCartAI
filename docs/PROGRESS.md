@@ -24,17 +24,17 @@
 | 13 | Kafka + full saga | Done — outbox/inbox, compensation, DLT wiring |
 | 14-15 | Notification / Analytics | Deferred — see DEFERRED.md |
 | 16-17 | AI RAG + Agent | Not started (small-scope version per REQUIREMENTS.md §7) |
-| 18 | Frontend completion | Done for customer and seller commerce flows |
-| 19 | Docker | In progress — clean rebuild still needs verification |
+| 18 | Frontend completion | Done — premium light/dark storefront redesign, responsive navbar/product cards, cart/checkout/payment, auth/account pages, seller studio, keyboard-accessible dialogs, and Nova AI entry point |
+| 19 | Docker | In progress — clean rebuild and all-service health verification still needed |
 | 20 | CI/CD | Reduced scope — basic CI only, see DEFERRED.md |
 | 21 | Cloud deployment | Deferred — documented, not executed |
 | 22 | Testing sweep | Reduced scope — risk-targeted, not 80% blanket |
-| 23 | Documentation | Ongoing alongside each phase |
+| 23 | Documentation | Ongoing — service statuses corrected; final QA/API notes remain |
 | 24 | Performance | Deferred |
 | 25 | Final review | In progress |
 
 ## In Flight
-Commerce slices are implemented and integrated: product/catalogue, cart/wishlist, inventory reservations, checkout/order saga, payment/coupons/refunds, notification simulation, seller product management, and item-level seller fulfilment. Frontend production build and Vitest checks pass. The next verification blocker is a clean Docker rebuild: Product Service dependency resolution stalled during the fresh-stack test and needs to be retried with a warm Maven cache.
+Commerce slices are implemented and integrated: product/catalogue, cart/wishlist, inventory reservations, checkout/order saga, payment/coupons/refunds, notification simulation, seller product management, and item-level seller fulfilment. The frontend redesign is complete and verified with `npm run build`, `npm run lint`, Vitest, and an isolated Playwright suite covering responsive layouts, themes, cart/wishlist, checkout seller IDs, seller CRUD/fulfilment, and account routes. The remaining integration blocker is a clean Docker rebuild: Product Service dependency resolution stalled during the fresh-stack test and needs to be retried with a warm Maven cache.
 
 ## Local Dev Setup (established Phase 7)
 - **Docker must be running** — MongoDB (`novacart-mongo`, :27017) and Redis (`novacart-redis`, :6379) run as local containers, started manually (`docker run -d --name novacart-mongo -p 27017:27017 mongo:7`, similarly for `redis:7-alpine`). Not yet in a docker-compose file — that's Phase 19's job; for now these are ad hoc local containers.

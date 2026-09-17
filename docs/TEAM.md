@@ -35,12 +35,12 @@ Cross-references CLAUDE.md's 25-phase table against the slice ownership above. U
 | 14 | Notification service | Member 3 | Deferred (logged-stub only, see DEFERRED.md) |
 | 15 | Analytics service | Member 4 | Deferred (Tier 3, see DEFERRED.md) |
 | 16-17 | AI RAG + Agent | Member 4 | Not started |
-| 18 | Frontend completion | Each member, their own slice's pages | Done for commerce flows |
+| 18 | Frontend completion | Each member, their own slice's pages | Done for commerce flows — premium light/dark redesign, responsive layouts, seller studio, cart/checkout dialogs and Nova AI entry point implemented |
 | 19 | Docker | Member 1 (DevOps) | In progress |
 | 20 | CI/CD | Member 1 (DevOps) | Reduced scope |
 | 21 | Cloud deployment | Member 1 (DevOps) | Deferred |
 | 22 | Testing sweep | Each member, their own slice | Reduced scope |
-| 23 | Documentation | Shared, ongoing | Ongoing |
+| 23 | Documentation | Shared, ongoing | Ongoing — service ownership/status is current; final QA notes and AI/API documentation remain |
 | 24 | Performance | Shared | Deferred |
 | 25 | Final review | Shared (all 4) | In progress |
 

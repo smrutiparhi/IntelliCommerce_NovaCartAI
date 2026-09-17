@@ -11,6 +11,11 @@ export interface Payment {
   failureReason?: string
 }
 
+export interface RazorpayConfig {
+  keyId: string
+  live: boolean
+}
+
 export interface CouponQuote {
   code: string
   discountPaise: number
@@ -22,12 +27,19 @@ export async function applyCoupon(code: string, orderAmountPaise: number): Promi
   return response.data
 }
 
-export async function processPayment(orderId: string, userId: string, amountPaise: number): Promise<Payment> {
+export async function getRazorpayConfig(): Promise<RazorpayConfig> {
+  const response = await apiClient.get<RazorpayConfig>('/payments/config')
+  return response.data
+}
+
+export async function processPayment(orderId: string, userId: string, amountPaise: number, payment?: { paymentId?: string; signature?: string }): Promise<Payment> {
   const response = await apiClient.post<Payment>('/payments/process', {
     orderId,
     userId,
     amountPaise,
     shouldFail: false,
+    razorpayPaymentId: payment?.paymentId,
+    razorpaySignature: payment?.signature,
   })
   return response.data
 }

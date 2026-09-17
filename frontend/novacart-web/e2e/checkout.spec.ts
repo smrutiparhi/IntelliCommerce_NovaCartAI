@@ -14,7 +14,7 @@ test('customer can register, add a product, checkout, pay, and open tracking', a
   await addButton.scrollIntoViewIfNeeded()
   await addButton.click({ force: true })
   await page.goto('/cart')
-  await expect(page.getByRole('heading', { name: 'Shopping cart' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Your good finds.' })).toBeVisible()
   await page.getByRole('link', { name: /Secure checkout/i }).click()
 
   await page.getByLabel('Full name').fill('Playwright Customer')

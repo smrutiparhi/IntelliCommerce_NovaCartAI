@@ -1,5 +1,5 @@
 import { ArrowUpRight, Search, Sparkles } from 'lucide-react'
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ProductCardGrid } from '../components/store/ProductCardGrid'
 
@@ -9,12 +9,13 @@ export function SearchPage() {
   const [params, setParams] = useSearchParams()
   const [input, setInput] = useState(params.get('q') ?? '')
   const query = params.get('q')?.trim() ?? ''
+  useEffect(() => { setInput(query) }, [query])
   function submit(event: FormEvent) { event.preventDefault(); setParams(input.trim() ? { q: input.trim() } : {}) }
 
   return (
-    <div className="min-h-screen bg-[var(--nc-bg)] py-12 text-[var(--nc-text)] lg:py-18">
+    <div className="nc-account-page min-h-screen bg-[var(--nc-bg)] py-12 text-[var(--nc-text)] lg:py-18">
       <div className="nc-shell">
-        <div className="grid gap-8 border-b border-black/10 pb-12 dark:border-white/10 lg:grid-cols-[.72fr_1.28fr] lg:items-end"><div><p className="nc-label flex items-center gap-2"><Sparkles className="h-3.5 w-3.5" /> Global search</p><h1 className="mt-5 text-h1">Find less.<br /><span className="text-slate-600">Know more.</span></h1></div><form onSubmit={submit} className="flex items-center gap-3 rounded-2xl border border-black/10 bg-[var(--nc-surface)] px-4 shadow-card focus-within:border-violet-400/60 dark:border-white/15 dark:focus-within:border-[#dfff36]/50"><Search className="h-5 w-5 text-slate-500" /><input value={input} onChange={(event) => setInput(event.target.value)} autoFocus aria-label="Search products, brands, or categories" placeholder="Search products, brands, or categories" className="h-18 min-w-0 flex-1 bg-transparent text-base text-slate-950 outline-none placeholder:text-slate-500 dark:text-white dark:placeholder:text-slate-600" /><button className="rounded-full bg-slate-950 px-5 py-2.5 text-xs font-bold text-white dark:bg-[#dfff36] dark:text-[#101217]">Search</button></form></div>
+        <div className="grid gap-8 border-b border-black/10 pb-12 dark:border-white/10 lg:grid-cols-[.72fr_1.28fr] lg:items-end"><div><p className="nc-label flex items-center gap-2"><Sparkles className="h-3.5 w-3.5" /> Find something good</p><h1 className="mt-5 text-h1">A world of<br /><span className="nc-muted">possibilities.</span></h1></div><form onSubmit={submit} className="flex items-center gap-3 rounded-2xl border border-black/10 bg-[var(--nc-surface)] px-4 shadow-card focus-within:border-violet-400/60 dark:border-white/15 dark:focus-within:border-[#dfff36]/50"><Search className="h-5 w-5 text-slate-500" /><input value={input} onChange={(event) => setInput(event.target.value)} autoFocus aria-label="Search products, brands, or categories" placeholder="Search products, brands, or categories" className="h-14 min-w-0 flex-1 bg-transparent text-base text-slate-950 outline-none placeholder:text-slate-500 dark:text-white dark:placeholder:text-slate-600" /><button className="rounded-full bg-slate-950 px-5 py-2.5 text-xs font-bold text-white dark:bg-[#dfff36] dark:text-[#101217]">Search</button></form></div>
 
         <section className="py-12"><ProductCardGrid query={query} />{query && <button onClick={() => { setInput(''); setParams({}) }} className="nc-secondary mt-10">Clear search</button>}</section>
 

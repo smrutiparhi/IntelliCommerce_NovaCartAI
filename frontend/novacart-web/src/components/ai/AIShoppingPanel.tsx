@@ -256,7 +256,8 @@ export function AIShoppingPanel() {
             value={inputVal}
             onChange={(e) => setInputVal(e.target.value)}
             placeholder="Ask anything..."
-            className="flex-1 bg-transparent text-body-sm text-slate-900 placeholder:text-slate-400 focus:outline-none dark:text-slate-100"
+            aria-label="Ask Nova AI"
+            className="min-w-0 flex-1 bg-transparent text-body-sm text-slate-900 placeholder:text-slate-400 focus:outline-none dark:text-slate-100"
           />
 
           <button

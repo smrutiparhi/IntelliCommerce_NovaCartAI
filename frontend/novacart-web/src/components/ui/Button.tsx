@@ -10,7 +10,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantStyles: Record<Variant, string> = {
-  primary: 'bg-indigo-500 text-white hover:bg-indigo-400 active:bg-indigo-600 shadow-card',
+  primary: 'bg-[#dfff36] text-[#20231e] hover:bg-[#d2f027] active:bg-[#c6e51d]',
   secondary:
     'bg-white text-slate-950 border border-white hover:bg-indigo-100 dark:bg-white/[.05] dark:text-slate-100 dark:border-white/10 dark:hover:bg-white/10',
   ghost: 'bg-transparent text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-dark-surface',
@@ -18,9 +18,9 @@ const variantStyles: Record<Variant, string> = {
 }
 
 const sizeStyles: Record<Size, string> = {
-  sm: 'h-9 px-4 text-body-sm rounded-full',
-  md: 'h-10 px-5 text-body-sm rounded-full',
-  lg: 'h-12 px-6 text-body-sm rounded-full',
+  sm: 'h-9 px-4 text-xs rounded-lg',
+  md: 'h-11 px-5 text-sm rounded-xl',
+  lg: 'h-12 px-6 text-sm rounded-xl',
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(

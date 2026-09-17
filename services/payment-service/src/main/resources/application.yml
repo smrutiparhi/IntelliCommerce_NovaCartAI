@@ -33,6 +33,7 @@ razorpay:
   key-id: ${RAZORPAY_KEY_ID:rzp_test_mockKeyId12345}
   key-secret: ${RAZORPAY_KEY_SECRET:mockKeySecret67890}
   webhook-secret: ${RAZORPAY_WEBHOOK_SECRET:mockWebhookSecret13579}
+  allow-simulation: ${RAZORPAY_ALLOW_SIMULATION:true}
 
 eureka:
   client:
