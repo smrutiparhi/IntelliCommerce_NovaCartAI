@@ -1,0 +1,6 @@
+[
+  {"query":"wireless headphones for travel","expectedSource":"headphones","minimumEvidence":1},
+  {"query":"delivery policy","expectedSource":"delivery","minimumEvidence":1},
+  {"query":"NOVA10 discount","expectedSource":"coupon-nova10","minimumEvidence":1},
+  {"query":"quantum telescope","expectedSource":null,"minimumEvidence":0}
+]

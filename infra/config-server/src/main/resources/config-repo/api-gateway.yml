@@ -73,7 +73,7 @@ spring:
         - id: ai-assistant-service
           uri: lb://ai-assistant-service
           predicates:
-            - Path=/api/v1/assistant/**
+            - Path=/api/v1/ai/**,/api/v1/assistant/**
 
       globalcors:
         cors-configurations:

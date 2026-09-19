@@ -28,6 +28,8 @@
     <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
     <resilience4j.version>2.2.0</resilience4j.version>
     <springdoc.version>2.6.0</springdoc.version>
+    <!-- Docker Engine 29 requires the recent 1.x compatibility fixes. -->
+    <testcontainers.version>1.21.4</testcontainers.version>
   </properties>
 
   <!-- Only infra services built in Phase 6 are modules so far. Each teammate adds their
@@ -44,6 +46,7 @@
     <module>services/order-service</module>
     <module>services/payment-service</module>
     <module>services/notification-service</module>
+    <module>services/ai-assistant-service</module>
   </modules>
 
   <dependencyManagement>

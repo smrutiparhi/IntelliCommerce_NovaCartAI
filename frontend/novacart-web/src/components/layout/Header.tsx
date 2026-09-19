@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowUpRight, ChevronDown, Heart, LayoutGrid, LogOut, Menu, Moon, Package, Search, Settings, ShoppingBag, Sun, User, X } from 'lucide-react'
+import { ArrowUpRight, BarChart3, ChevronDown, Heart, LayoutGrid, LogOut, Menu, Moon, Package, Search, Settings, ShoppingBag, Sun, User, X } from 'lucide-react'
 import { useMutation } from '@tanstack/react-query'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
@@ -44,6 +44,7 @@ export function Header(_props: { overlay?: boolean }) {
   const logoutMutation = useMutation({ mutationFn: logoutRequest, onSettled: () => { clearAuth(); navigate('/', { replace: true }) } })
   const toggleMenu = (next: 'shop' | 'account' | 'mobile') => setMenu((current) => current === next ? null : next)
   const seller = user?.roles.some((role) => role === 'ROLE_SELLER' || role === 'ROLE_ADMIN')
+  const admin = user?.roles.includes('ROLE_ADMIN')
 
   useEffect(() => {
     const scroll = () => setScrolled(window.scrollY > 15)
@@ -92,13 +93,14 @@ export function Header(_props: { overlay?: boolean }) {
             <div className="px-3 py-3 mb-1 border-b"><p className="text-sm font-semibold">{user?.fullName}</p><p className="nc-muted mt-1 text-[10px] truncate">{user?.email}</p></div>
             <Link to="/profile"><User /> My profile</Link><Link to="/orders"><Package /> My orders</Link><Link to="/settings"><Settings /> Account settings</Link>
             {seller && <Link to="/seller"><LayoutGrid /> Seller studio</Link>}
+            {admin && <Link to="/admin/analytics"><BarChart3 /> AI analytics</Link>}
             <button onClick={() => logoutMutation.mutate()} disabled={logoutMutation.isPending}><LogOut /> Sign out</button>
           </motion.div>}
           {menu === 'mobile' && <motion.nav {...menuMotion} id="mobile-menu" aria-label="Mobile navigation" className="nc-menu-popover nc-mobile-menu">
             <p className="nc-label px-3 py-2">Your world, thoughtfully selected</p>
             <Link to="/categories">Shop all categories</Link>{navigation.map(({ label, to }) => <Link key={to} to={to}>{label}</Link>)}
             <Link to="/wishlist">Wishlist</Link><Link to="/ai-assistant">Meet Nova AI</Link>
-            {isAuthenticated ? <><Link to="/orders">My orders</Link><Link to="/profile">My profile</Link><Link to="/settings">Account settings</Link>{seller && <Link to="/seller">Seller studio</Link>}<button onClick={() => logoutMutation.mutate()} className="nc-secondary">Sign out</button></> : <Link to="/login" className="nc-primary">Sign in</Link>}
+            {isAuthenticated ? <><Link to="/orders">My orders</Link><Link to="/profile">My profile</Link><Link to="/settings">Account settings</Link>{seller && <Link to="/seller">Seller studio</Link>}{admin && <Link to="/admin/analytics">AI analytics</Link>}<button onClick={() => logoutMutation.mutate()} className="nc-secondary">Sign out</button></> : <Link to="/login" className="nc-primary">Sign in</Link>}
           </motion.nav>}
         </AnimatePresence>
       </div>

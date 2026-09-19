@@ -144,6 +144,16 @@ export async function getProduct(idOrSlug: string): Promise<{ product?: StorePro
     const response = await apiClient.get<ProductApiModel>(`/products/${encodeURIComponent(idOrSlug)}`)
     return { product: mapApiProduct(response.data), source: 'api' }
   } catch {
+    // A citation can be opened immediately after an index refresh. If the
+    // detail request briefly misses, resolve it from the current live catalogue
+    // before falling back to the bundled demo products.
+    try {
+      const live = await fetchAllProducts()
+      const product = live.products.find((item) => item.id === idOrSlug || item.slug === idOrSlug)
+      if (product) return { product: mapApiProduct(product), source: 'api' }
+    } catch {
+      // Keep the local fallback below as the final offline path.
+    }
     return { product: PRODUCTS.find((product) => product.id === idOrSlug), source: 'fallback' }
   }
 }

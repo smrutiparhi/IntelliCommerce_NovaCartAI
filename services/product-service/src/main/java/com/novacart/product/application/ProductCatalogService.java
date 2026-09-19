@@ -8,6 +8,7 @@ import com.novacart.product.domain.ProductNotFoundException;
 import com.novacart.product.infrastructure.CategoryRepository;
 import com.novacart.product.infrastructure.ProductRepository;
 import com.novacart.product.infrastructure.ReviewRepository;
+import com.novacart.product.infrastructure.ProductChangeNotifier;
 import com.novacart.product.domain.Review;
 import com.novacart.product.api.dto.ReviewRequest;
 import com.novacart.product.api.dto.ReviewResponse;
@@ -25,6 +26,7 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 
 @Service
 public class ProductCatalogService {
@@ -32,9 +34,16 @@ public class ProductCatalogService {
     private final CategoryRepository categories;
     private final MongoTemplate mongo;
     private final ReviewRepository reviews;
+    private final ProductChangeNotifier notifier;
 
+    @Autowired
+    public ProductCatalogService(ProductRepository products, CategoryRepository categories, MongoTemplate mongo, ReviewRepository reviews, ProductChangeNotifier notifier) {
+        this.products = products; this.categories = categories; this.mongo = mongo; this.reviews = reviews; this.notifier = notifier;
+    }
+
+    // Kept for focused unit tests that do not need cross-service notification.
     public ProductCatalogService(ProductRepository products, CategoryRepository categories, MongoTemplate mongo, ReviewRepository reviews) {
-        this.products = products; this.categories = categories; this.mongo = mongo; this.reviews = reviews;
+        this(products, categories, mongo, reviews, null);
     }
 
     public List<ReviewResponse> reviews(String idOrSlug) {
@@ -52,7 +61,7 @@ public class ProductCatalogService {
         Review saved = reviews.save(review);
         List<Review> all = reviews.findByProductIdOrderByUpdatedAtDesc(product.id);
         product.reviewCount = all.size(); product.rating = all.stream().mapToInt(value -> value.rating).average().orElse(0);
-        products.save(product); return reviewResponse(saved);
+        products.save(product); if (notifier != null) notifier.changed(product.id); return reviewResponse(saved);
     }
 
     private Product findProduct(String idOrSlug) {
@@ -102,7 +111,9 @@ public class ProductCatalogService {
         apply(product, request);
         product.rating = 0; product.reviewCount = 0;
         product.createdAt = Instant.now(); product.updatedAt = product.createdAt;
-        return response(products.save(product));
+        ProductResponse saved = response(products.save(product));
+        if (notifier != null) notifier.changed(saved.id());
+        return saved;
     }
 
     public ProductResponse update(String id, ProductRequest request, String actorId, boolean admin) {
@@ -110,13 +121,16 @@ public class ProductCatalogService {
         requireOwner(product, actorId, admin);
         requireCategory(request.categorySlug());
         apply(product, request); product.updatedAt = Instant.now();
-        return response(products.save(product));
+        ProductResponse saved = response(products.save(product));
+        if (notifier != null) notifier.changed(saved.id());
+        return saved;
     }
 
     public void delete(String id, String actorId, boolean admin) {
         Product product = products.findById(id).orElseThrow(() -> new ProductNotFoundException(id));
         requireOwner(product, actorId, admin);
         product.active = false; product.updatedAt = Instant.now(); products.save(product);
+        if (notifier != null) notifier.changed(product.id);
     }
 
     private void apply(Product product, ProductRequest request) {

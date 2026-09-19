@@ -1,0 +1,20 @@
+server:
+  port: 8089
+
+novacart:
+  product-service-url: ${NOVACART_PRODUCT_SERVICE_URL:http://product-service:8082}
+  order-service-url: ${NOVACART_ORDER_SERVICE_URL:http://order-service:8085}
+  rag:
+    initial-delay-ms: ${RAG_INITIAL_DELAY_MS:30000}
+    refresh-ms: ${RAG_REFRESH_MS:900000}
+    minimum-score: ${RAG_MINIMUM_SCORE:0.18}
+  openai:
+    api-key: ${OPENAI_API_KEY:}
+    base-url: ${OPENAI_BASE_URL:https://api.openai.com}
+    response-model: ${OPENAI_RESPONSE_MODEL:gpt-4.1-mini}
+    embedding-model: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URI:http://eureka-server:8761/eureka/}

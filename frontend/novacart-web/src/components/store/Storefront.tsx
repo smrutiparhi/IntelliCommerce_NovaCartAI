@@ -1,4 +1,5 @@
 import { ArrowRight, ArrowUpRight, Headphones, Leaf, PackageCheck, ShieldCheck, Sparkles, Truck } from 'lucide-react'
+import type { SyntheticEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { Reveal } from '../motion/DepthCard'
 import { ProductCardGrid } from './ProductCardGrid'
@@ -6,6 +7,11 @@ import { useAIStore } from '../../stores/ai-store'
 import { AIShoppingPanel } from '../ai/AIShoppingPanel'
 
 const photo = (id: string, width = 900) => `https://images.unsplash.com/${id}?auto=format&fit=crop&w=${width}&q=85`
+const fallbackArt = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='900' height='700' viewBox='0 0 900 700'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop stop-color='%2321261f'/%3E%3Cstop offset='1' stop-color='%23dfff36'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='900' height='700' fill='url(%23g)'/%3E%3Ccircle cx='700' cy='180' r='150' fill='%23ffffff' fill-opacity='.16'/%3E%3Cpath d='M270 450c40-150 320-150 360 0' fill='none' stroke='%23fff' stroke-width='28' stroke-linecap='round'/%3E%3Ccircle cx='360' cy='420' r='58' fill='none' stroke='%23fff' stroke-width='22'/%3E%3Ccircle cx='540' cy='420' r='58' fill='none' stroke='%23fff' stroke-width='22'/%3E%3C/svg%3E`
+const handleImageError = (event: SyntheticEvent<HTMLImageElement>) => {
+  const image = event.currentTarget
+  if (image.src !== fallbackArt) image.src = fallbackArt
+}
 const collections = [
   { name: 'Technology', image: 'photo-1496181133206-80ce9b88a853' },
   { name: 'Audio', image: 'photo-1505740420928-5e560c06d30e' },
@@ -41,16 +47,16 @@ export function Storefront({ member = false }: { member?: boolean }) {
       </div>
       <div className="nc-hero-visuals">
         <Link to="/search?q=Audio" className="nc-feature nc-feature-main">
-          <img src={photo('photo-1505740420928-5e560c06d30e')} alt="Black headphones against a warm yellow backdrop" fetchPriority="high" />
+          <img src="/hero-headphones.svg" onError={handleImageError} alt="Black headphones against a warm yellow backdrop" fetchPriority="high" />
           <div className="nc-feature-label"><span>The listening room</span><span>01 / 03</span></div>
           <div className="nc-feature-caption"><div><p>Tune into something good</p><strong>Sound. Without the noise.</strong></div><span className="nc-round-arrow"><ArrowUpRight size={17} /></span></div>
         </Link>
         <Link to="/search?q=Fashion" className="nc-feature nc-feature-small">
-          <img src={photo('photo-1549298916-b41d501d3772',600)} alt="Everyday sneakers in warm earthy tones" />
+          <img src={photo('photo-1549298916-b41d501d3772',600)} onError={handleImageError} alt="Everyday sneakers in warm earthy tones" />
           <div className="nc-feature-caption"><div><p>Made for your next move</p><strong>Everyday, in style.</strong></div><span className="nc-round-arrow"><ArrowUpRight size={15} /></span></div>
         </Link>
         <Link to="/search?q=Home" className="nc-feature nc-feature-small">
-          <img src={photo('photo-1592078615290-033ee584e267',600)} alt="Sculptural green chair in a quiet living space" />
+          <img src={photo('photo-1592078615290-033ee584e267',600)} onError={handleImageError} alt="Sculptural green chair in a quiet living space" />
           <div className="nc-feature-caption"><div><p>A place to slow down</p><strong>Make yourself at home.</strong></div><span className="nc-round-arrow"><ArrowUpRight size={15} /></span></div>
         </Link>
       </div>

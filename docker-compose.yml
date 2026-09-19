@@ -244,6 +244,7 @@ services:
       SPRING_CONFIG_IMPORT: "configserver:http://config-server:8888"
       SPRING_DATA_MONGODB_URI: "mongodb://product_svc:product_svc_pw@mongodb:27017/product_db"
       EUREKA_DEFAULT_ZONE: "http://eureka-server:8761/eureka/"
+      NOVACART_AI_SERVICE_URL: "http://ai-assistant-service:8089"
     depends_on:
       api-gateway:
         condition: service_healthy
@@ -378,9 +379,12 @@ services:
     networks:
       - novacart-net
 
-  # ── Member 4 — AI & Ops (stub) ───────────────────────────────────────────────
+  # ── AI Assistant — grounded retrieval + agent foundation ─────────────────────
 
   ai-assistant-service:
+    build:
+      context: .
+      dockerfile: services/ai-assistant-service/Dockerfile
     image: novacart/ai-assistant-service:local
     container_name: novacart-ai
     profiles: [backend]
@@ -388,10 +392,18 @@ services:
       - "8089:8089"
     environment:
       SPRING_CONFIG_IMPORT: "configserver:http://config-server:8888"
+      NOVACART_PRODUCT_SERVICE_URL: "http://product-service:8082"
+      NOVACART_ORDER_SERVICE_URL: "http://order-service:8085"
       SPRING_DATA_MONGODB_URI: "mongodb://ai_svc:ai_svc_pw@mongodb:27017/ai_db"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      OPENAI_RESPONSE_MODEL: "${OPENAI_RESPONSE_MODEL:-gpt-4.1-mini}"
+      OPENAI_EMBEDDING_MODEL: "${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}"
+      EUREKA_URI: "http://eureka-server:8761/eureka/"
     depends_on:
       api-gateway:
         condition: service_healthy
+      product-service:
+        condition: service_started
       mongodb:
         condition: service_healthy
     networks:

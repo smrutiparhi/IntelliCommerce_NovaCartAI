@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { AI_GENERATED_FLORAL, AI_GENERATED_PUFFERS } from '../data/store-products'
+import { askNova, proposeCancellation, confirmCancellation, compareNovaProducts, submitAiFeedback } from '../api/ai'
 
 export interface ChatMessage {
   id: string
@@ -8,6 +9,11 @@ export interface ChatMessage {
   generatedImages?: { id: string; title: string; image: string }[]
   isGeneratingImages?: boolean
   referenceImage?: string
+  citations?: { id: string; title: string; source: string }[]
+  mode?: string
+  cancellation?: { confirmationToken: string; orderId: string; expiresAt: string; confirmed?: boolean }
+  comparison?: { products: Array<{ id: string; title: string; brand: string; priceInPaise: number; rating: number }> }
+  feedback?: 'helpful' | 'not-helpful'
   timestamp: string
 }
 
@@ -25,7 +31,9 @@ interface AIState {
   togglePanel: () => void
   setPanelOpen: (open: boolean) => void
   setUploadModalOpen: (open: boolean) => void
-  sendChatMessage: (text: string) => void
+  sendChatMessage: (text: string) => Promise<void>
+  confirmCancellation: (messageId: string, token: string) => Promise<void>
+  rateMessage: (messageId: string, helpful: boolean) => Promise<void>
   triggerImageGeneration: (prompt?: string) => void
   handleImageUpload: (imageUrl: string, searchPrompt?: string) => void
 }
@@ -52,7 +60,7 @@ export const useAIStore = create<AIState>((set, get) => ({
   setPanelOpen: (open) => set({ isPanelOpen: open }),
   setUploadModalOpen: (open) => set({ isUploadModalOpen: open }),
 
-  sendChatMessage: (text) => {
+  sendChatMessage: async (text) => {
     const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     const userMsg: ChatMessage = {
       id: `user-${Date.now()}`,
@@ -67,29 +75,59 @@ export const useAIStore = create<AIState>((set, get) => ({
     }))
 
     const lower = text.toLowerCase()
+    const cancelMatch = lower.match(/(?:cancel|stop)\s+(?:order\s+)?([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})/i)
+    if (cancelMatch) {
+      try {
+        const proposal = await proposeCancellation(cancelMatch[1])
+        set((state) => ({ messages: [...state.messages, { id: `ai-cancel-${Date.now()}`, sender: 'ai', text: proposal.message, cancellation: { confirmationToken: proposal.confirmationToken, orderId: proposal.orderId, expiresAt: proposal.expiresAt }, timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }] }))
+      } catch {
+        set((state) => ({ messages: [...state.messages, { id: `ai-cancel-error-${Date.now()}`, sender: 'ai', text: 'I could not prepare cancellation for that order. It may already be shipped, cancelled, or not belong to your account.', timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }] }))
+      }
+      return
+    }
+    const compareMatch = text.match(/compare\s+(.+?)\s+(?:vs\.?|and|with)\s+(.+)/i)
+    if (compareMatch) {
+      try {
+        const reply = await compareNovaProducts(compareMatch[1].trim(), compareMatch[2].trim())
+        set((state) => ({ messages: [...state.messages, { id: `ai-compare-${Date.now()}`, sender: 'ai', text: reply.summary, citations: reply.citations, comparison: { products: reply.products }, timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }] }))
+      } catch {
+        set((state) => ({ messages: [...state.messages, { id: `ai-compare-error-${Date.now()}`, sender: 'ai', text: 'I could not compare those products. Use their exact catalogue names or slugs and try again.', timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }] }))
+      }
+      return
+    }
     if (lower.includes('generate') || lower.includes('image') || lower.includes('patterned')) {
       get().triggerImageGeneration(text)
-    } else if (lower.includes('denim') || lower.includes('jacket')) {
-      setTimeout(() => {
-        const aiResponse: ChatMessage = {
-          id: `ai-${Date.now()}`,
-          sender: 'ai',
-          text: 'Sure! Here are some of our top rated denim jackets you might like.',
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        }
-        set((state) => ({ messages: [...state.messages, aiResponse] }))
-      }, 700)
     } else {
-      setTimeout(() => {
-        const aiResponse: ChatMessage = {
-          id: `ai-${Date.now()}`,
-          sender: 'ai',
-          text: `I've updated your search results for "${text}". Let me know if you want to generate variations or refine by color and fit!`,
+      try {
+        const reply = await askNova(text)
+        set((state) => ({ messages: [...state.messages, {
+          id: `ai-${Date.now()}`, sender: 'ai', text: reply.answer,
+          citations: reply.citations, mode: reply.mode,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        }
-        set((state) => ({ messages: [...state.messages, aiResponse] }))
-      }, 800)
+        }] }))
+      } catch {
+        set((state) => ({ messages: [...state.messages, {
+          id: `ai-error-${Date.now()}`, sender: 'ai',
+          text: 'Nova is temporarily unavailable. You can still browse the live catalogue while I reconnect.',
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        }] }))
+      }
     }
+  },
+
+  confirmCancellation: async (messageId, token) => {
+    try {
+      const result = await confirmCancellation(token)
+      set((state) => ({ messages: state.messages.map((message) => message.id === messageId ? { ...message, text: result.message, cancellation: message.cancellation ? { ...message.cancellation, confirmed: true } : undefined } : message) }))
+    } catch {
+      set((state) => ({ messages: state.messages.map((message) => message.id === messageId ? { ...message, text: 'Cancellation confirmation expired or was already used.', cancellation: undefined } : message) }))
+    }
+  },
+
+  rateMessage: async (messageId, helpful) => {
+    set((state) => ({ messages: state.messages.map((message) => message.id === messageId ? { ...message, feedback: helpful ? 'helpful' : 'not-helpful' } : message) }))
+    try { await submitAiFeedback(messageId, helpful) }
+    catch { set((state) => ({ messages: state.messages.map((message) => message.id === messageId ? { ...message, feedback: undefined } : message) })) }
   },
 
   triggerImageGeneration: (prompt) => {

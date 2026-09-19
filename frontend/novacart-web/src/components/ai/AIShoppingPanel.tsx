@@ -9,6 +9,8 @@ import {
   Minimize2,
   RefreshCw,
   Upload,
+  ThumbsDown,
+  ThumbsUp,
 } from 'lucide-react'
 import { useAIStore } from '../../stores/ai-store'
 import { ImageUploadModal } from './ImageUploadModal'
@@ -20,6 +22,12 @@ const QUICK_PROMPTS = [
   'Leather Jacket',
 ]
 
+function citationHref(source: string) {
+  if (source.startsWith('/products/')) return source
+  if (source.startsWith('catalogue/product/')) return `/${source}`
+  return undefined
+}
+
 export function AIShoppingPanel() {
   const {
     messages,
@@ -29,6 +37,8 @@ export function AIShoppingPanel() {
     sendChatMessage,
     triggerImageGeneration,
     setUploadModalOpen,
+    confirmCancellation,
+    rateMessage,
   } = useAIStore()
 
   const [inputVal, setInputVal] = useState('')
@@ -139,6 +149,21 @@ export function AIShoppingPanel() {
                   )}
 
                   {msg.text && <p>{msg.text}</p>}
+                  {msg.citations && msg.citations.length > 0 && (
+                    <div className="mt-3 border-t border-current/10 pt-2 text-[10px] opacity-75">
+                      <p className="font-bold uppercase tracking-wider">Grounded in catalogue</p>
+                      {msg.citations.slice(0, 3).map((citation) => {
+                        const href = citationHref(citation.source)
+                        return href
+                          ? <a key={citation.id} href={href} className="mt-1 block truncate underline decoration-current/30 underline-offset-2 hover:opacity-100">↗ {citation.title}</a>
+                          : <p key={citation.id} className="mt-1 truncate">↗ {citation.title}</p>
+                      })}
+                    </div>
+                  )}
+                  {msg.cancellation && !msg.cancellation.confirmed && (
+                    <button type="button" onClick={() => confirmCancellation(msg.id, msg.cancellation!.confirmationToken)} className="mt-3 rounded-full bg-rose-500 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-rose-600">Confirm cancellation</button>
+                  )}
+                  {msg.comparison && <div className="mt-3 grid gap-2 border-t border-current/10 pt-3">{msg.comparison.products.map((product) => <a key={product.id} href={`/products/${product.id}`} className="rounded-xl border border-current/10 p-2 hover:bg-current/5"><p className="truncate text-[11px] font-bold">{product.title}</p><p className="mt-1 text-[10px] opacity-70">{product.brand} · ₹{Math.round(product.priceInPaise / 100).toLocaleString('en-IN')} · ★ {product.rating.toFixed(1)}</p></a>)}</div>}
                 </div>
               </div>
 
@@ -209,6 +234,7 @@ export function AIShoppingPanel() {
               )}
 
               <span className="mt-1 px-1 text-[10px] text-slate-400">{msg.timestamp}</span>
+              {msg.sender === 'ai' && msg.id !== 'msg-welcome' && !msg.isGeneratingImages && <div className="mt-1 flex items-center gap-1 pl-9"><button type="button" onClick={() => rateMessage(msg.id, true)} aria-label="Mark response helpful" className={`rounded-full p-1.5 transition ${msg.feedback === 'helpful' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-400/15 dark:text-emerald-300' : 'text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10'}`}><ThumbsUp size={12} /></button><button type="button" onClick={() => rateMessage(msg.id, false)} aria-label="Mark response not helpful" className={`rounded-full p-1.5 transition ${msg.feedback === 'not-helpful' ? 'bg-rose-100 text-rose-600 dark:bg-rose-400/15 dark:text-rose-300' : 'text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10'}`}><ThumbsDown size={12} /></button>{msg.feedback && <span className="ml-1 text-[10px] text-slate-400">Thanks for the feedback</span>}</div>}
             </motion.div>
           ))}
         </AnimatePresence>

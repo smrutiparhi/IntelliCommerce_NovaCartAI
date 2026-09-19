@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" role="img" aria-labelledby="title desc">
+  <title id="title">NovaCart headphones</title>
+  <desc id="desc">Abstract headphones on a warm lime and charcoal background.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#151b17"/>
+      <stop offset="1" stop-color="#dfff36"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".28"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="900" fill="url(#bg)"/>
+  <circle cx="930" cy="180" r="250" fill="#fff" opacity=".12"/>
+  <path d="M314 510c22-210 550-210 572 0" fill="none" stroke="#f7f8ef" stroke-width="54" stroke-linecap="round"/>
+  <rect x="264" y="456" width="170" height="238" rx="72" fill="#101612" stroke="#f7f8ef" stroke-width="20"/>
+  <rect x="766" y="456" width="170" height="238" rx="72" fill="#101612" stroke="#f7f8ef" stroke-width="20"/>
+  <path d="M290 485h118v150H290zM792 485h118v150H792z" fill="url(#shine)"/>
+  <circle cx="350" cy="568" r="28" fill="#dfff36"/>
+  <circle cx="850" cy="568" r="28" fill="#dfff36"/>
+</svg>

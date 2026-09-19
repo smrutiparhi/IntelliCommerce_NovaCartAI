@@ -22,22 +22,22 @@
 | 11 | Order service | Done — checkout, cancellation, item-level seller fulfilment |
 | 12 | Payment service | Done — payment simulation, coupons, refunds, signature checks |
 | 13 | Kafka + full saga | Done — outbox/inbox, compensation, DLT wiring |
-| 14-15 | Notification / Analytics | Deferred — see DEFERRED.md |
-| 16-17 | AI RAG + Agent | Not started (small-scope version per REQUIREMENTS.md §7) |
+| 14-15 | Notification / Analytics | Notification simulation done; standalone analytics service remains intentionally deferred per DEFERRED.md, with the admin analytics UI available |
+| 16-17 | AI RAG + Agent | Done for the local/free scope — grounded catalogue and policy retrieval, clickable citations, persisted history, order tools, confirmation flow, re-index hooks, safety controls, and automated evaluation tests. OpenAI remains an optional paid provider. |
 | 18 | Frontend completion | Done — premium light/dark storefront redesign, responsive navbar/product cards, cart/checkout/payment, auth/account pages, seller studio, keyboard-accessible dialogs, and Nova AI entry point |
-| 19 | Docker | In progress — clean rebuild and all-service health verification still needed |
+| 19 | Docker | Done — Docker Engine 29.7.2 compatibility fixed, clean service images rebuilt, and ports 8761/8888/8080-8087/8089 verified healthy |
 | 20 | CI/CD | Reduced scope — basic CI only, see DEFERRED.md |
 | 21 | Cloud deployment | Deferred — documented, not executed |
-| 22 | Testing sweep | Reduced scope — risk-targeted, not 80% blanket |
-| 23 | Documentation | Ongoing — service statuses corrected; final QA/API notes remain |
+| 22 | Testing sweep | Done for the agreed risk-targeted scope — Maven reactor, saga/compensation, Razorpay signatures, Vitest, production build, and 9 Playwright flows pass |
+| 23 | Documentation | Done — implementation, MongoDB usage, ownership, progress, and final QA status documented |
 | 24 | Performance | Deferred |
-| 25 | Final review | In progress |
+| 25 | Final review | Done locally — the complete stack is healthy and critical customer, seller, AI, and browser flows are verified |
 
 ## In Flight
-Commerce slices are implemented and integrated: product/catalogue, cart/wishlist, inventory reservations, checkout/order saga, payment/coupons/refunds, notification simulation, seller product management, and item-level seller fulfilment. The frontend redesign is complete and verified with `npm run build`, `npm run lint`, Vitest, and an isolated Playwright suite covering responsive layouts, themes, cart/wishlist, checkout seller IDs, seller CRUD/fulfilment, and account routes. The remaining integration blocker is a clean Docker rebuild: Product Service dependency resolution stalled during the fresh-stack test and needs to be retried with a warm Maven cache.
+All planned local commerce and AI slices are implemented and integrated. Final QA on 2026-09-19 verified every required health endpoint, the Maven reactor including `SagaIntegrationTest`, frontend unit tests and production build, and all 9 Chromium Playwright flows. The final live checkout confirmed register → cart → seller-aware order → stock reservation → payment → confirmation → tracking across the deployed containers.
 
 ## Local Dev Setup (established Phase 7)
-- **Docker must be running** — MongoDB (`novacart-mongo`, :27017) and Redis (`novacart-redis`, :6379) run as local containers, started manually (`docker run -d --name novacart-mongo -p 27017:27017 mongo:7`, similarly for `redis:7-alpine`). Not yet in a docker-compose file — that's Phase 19's job; for now these are ad hoc local containers.
+- **Docker must be running.** Start the complete local stack from the repository root with `docker compose --profile infra --profile platform --profile backend up -d`. MongoDB, PostgreSQL, Redis, Kafka/ZooKeeper, Eureka, Config Server, Gateway, and all backend services are defined in `docker-compose.yml`.
 - **JWT keypair**: generate once via `openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out keys/jwt-private-key.pem && openssl rsa -pubout -in keys/jwt-private-key.pem -out keys/jwt-public-key.pem`. `keys/` is gitignored — every clone needs its own. See `.env.example` for the env vars each service needs (`JWT_PRIVATE_KEY_PATH` for Auth Service only, `JWT_PUBLIC_KEY_PATH` for both Auth Service and Gateway).
 - **Launch order**: Eureka → Config Server → Gateway → Auth Service (each waits on the previous being healthy; Auth Service and Gateway both need `spring.config.import` to reach Config Server at startup).
 

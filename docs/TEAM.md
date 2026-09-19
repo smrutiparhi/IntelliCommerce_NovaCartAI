@@ -32,17 +32,17 @@ Cross-references CLAUDE.md's 25-phase table against the slice ownership above. U
 | 11 | Order service | Member 3 | Done |
 | 12 | Payment service | Member 3 | Done |
 | 13 | Kafka + full saga | Member 3 | Done |
-| 14 | Notification service | Member 3 | Deferred (logged-stub only, see DEFERRED.md) |
+| 14 | Notification service | Member 3 | Done for agreed scope — logged event simulation; real email/SMS intentionally deferred |
 | 15 | Analytics service | Member 4 | Deferred (Tier 3, see DEFERRED.md) |
-| 16-17 | AI RAG + Agent | Member 4 | Not started |
+| 16-17 | AI RAG + Agent | Member 4 | Done for local/free scope — grounded RAG, citations/history, evaluations, safety controls, catalogue re-indexing, and confirmed order tools live on port 8089 |
 | 18 | Frontend completion | Each member, their own slice's pages | Done for commerce flows — premium light/dark redesign, responsive layouts, seller studio, cart/checkout dialogs and Nova AI entry point implemented |
-| 19 | Docker | Member 1 (DevOps) | In progress |
+| 19 | Docker | Member 1 (DevOps) | Done — full profiled stack rebuilt and all required health endpoints verified |
 | 20 | CI/CD | Member 1 (DevOps) | Reduced scope |
 | 21 | Cloud deployment | Member 1 (DevOps) | Deferred |
-| 22 | Testing sweep | Each member, their own slice | Reduced scope |
-| 23 | Documentation | Shared, ongoing | Ongoing — service ownership/status is current; final QA notes and AI/API documentation remain |
+| 22 | Testing sweep | Each member, their own slice | Done for agreed risk-targeted scope — backend, saga, frontend, and 9 browser flows pass |
+| 23 | Documentation | Shared, ongoing | Done for local project handoff |
 | 24 | Performance | Shared | Deferred |
-| 25 | Final review | Shared (all 4) | In progress |
+| 25 | Final review | Shared (all 4) | Done locally |
 
 ---
 

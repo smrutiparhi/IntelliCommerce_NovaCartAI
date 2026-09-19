@@ -33,6 +33,7 @@ const ProfilePage = lazy(() => import('./pages/Profile').then((module) => ({ def
 const SettingsPage = lazy(() => import('./pages/Settings').then((module) => ({ default: module.SettingsPage })))
 const SupportPage = lazy(() => import('./pages/Support').then((module) => ({ default: module.SupportPage })))
 const SellerDashboardPage = lazy(() => import('./pages/seller/SellerDashboard').then((module) => ({ default: module.SellerDashboardPage })))
+const AnalyticsDashboardPage = lazy(() => import('./pages/admin/AnalyticsDashboard').then((module) => ({ default: module.AnalyticsDashboardPage })))
 
 function RouteLoader() {
   return <div className="min-h-screen bg-[var(--nc-bg)] px-5 pt-32 text-[var(--nc-text)]"><div className="mx-auto max-w-shell"><div className="h-3 w-24 animate-pulse rounded-full bg-indigo-400/20" /><div className="mt-6 h-16 max-w-xl animate-pulse rounded-2xl bg-white/[.05]" /><div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{[0, 1, 2].map((item) => <div key={item} className="aspect-[4/3] animate-pulse rounded-[2rem] border border-white/5 bg-white/[.03]" />)}</div></div></div>
@@ -102,6 +103,7 @@ const router = createBrowserRouter([
           { path: 'settings',      element: <SettingsPage /> },
           { path: 'support',       element: <SupportPage /> },
           { path: 'seller',        element: <SellerDashboardPage /> },
+          { path: 'admin/analytics', element: <AnalyticsDashboardPage /> },
         ],
       },
     ],
