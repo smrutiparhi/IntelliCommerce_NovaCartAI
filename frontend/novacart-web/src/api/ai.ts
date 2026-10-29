@@ -56,7 +56,8 @@ export interface RagIndexStatus {
   chunks: number
   embeddingModel: string
   responseModel: string
-  openAiEnabled: boolean
+  modelEnabled: boolean
+  provider: 'local' | 'openai' | 'gemini'
   indexing: boolean
   lastIndexedAt: string | null
   lastError: string | null

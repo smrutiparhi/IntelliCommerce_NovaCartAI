@@ -17,21 +17,8 @@ import org.springframework.context.annotation.Profile;
 @Configuration
 public class InventorySeedConfig {
 
-    private static final List<String> BASE_PRODUCT_IDS = List.of(
-        "nova-orbit-x1", "nova-book-air-14", "luma-view-27", "keyframe-k75",
-        "auralis-studio-one", "pulse-air-mini", "resonance-room-speaker",
-        "waypoint-denim-jacket", "atelier-oxford-shirt", "drift-court-sneaker",
-        "haven-lounge-chair", "arc-glow-lamp", "loom-textured-throw",
-        "brewline-espresso", "aero-crisp-airfryer", "pureflow-air",
-        "dewdrop-barrier-serum", "velvet-cloud-lip", "terra-no7-fragrance",
-        "motion-pro-mat", "stride-flow-runner", "forge-adjustable-dumbbell",
-        "folio-intentional-day", "folio-systems-scale", "highland-coffee",
-        "goodgrain-granola", "playform-blocks", "brightbot-starter-kit",
-        "arc-time-steel", "metro-daypack-20", "halo-frame-sunglasses"
-    );
-
     private static List<String> productIds() {
-        List<String> ids = new ArrayList<>(BASE_PRODUCT_IDS);
+        List<String> ids = new ArrayList<>();
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(
             InventorySeedConfig.class.getResourceAsStream("/real-products.tsv"), StandardCharsets.UTF_8))) {
             reader.lines().skip(1).forEach(line -> ids.add(line.split("\\t", 2)[0]));

@@ -67,11 +67,24 @@ public class JwtValidationFilter implements GlobalFilter, Ordered {
         ServerHttpRequest request = exchange.getRequest();
         String path = request.getURI().getPath();
 
-        if (PUBLIC_PATHS.contains(path) || isPublicCatalogueRead(request.getMethod(), path)) {
-            return chain.filter(exchange);
+        // This hook is for the product service on the private Docker network only.
+        if (path.equals("/api/v1/ai/rag/product-updated")) {
+            exchange.getResponse().setStatusCode(HttpStatus.FORBIDDEN);
+            return exchange.getResponse().setComplete();
         }
 
-        String header = request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+        ServerHttpRequest sanitized = request.mutate().headers(headers -> {
+            headers.remove("X-User-Id");
+            headers.remove("X-User-Roles");
+            headers.remove("X-Internal-Service");
+        }).build();
+        ServerWebExchange sanitizedExchange = exchange.mutate().request(sanitized).build();
+
+        if (PUBLIC_PATHS.contains(path) || isPublicCatalogueRead(request.getMethod(), path)) {
+            return chain.filter(sanitizedExchange);
+        }
+
+        String header = sanitized.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
         if (header == null || !header.startsWith("Bearer ")) {
             return unauthorized(exchange, "Missing or malformed Authorization header");
         }
@@ -95,12 +108,12 @@ public class JwtValidationFilter implements GlobalFilter, Ordered {
                 @SuppressWarnings("unchecked")
                 List<String> roles = claims.get("roles", List.class);
 
-                ServerHttpRequest mutatedRequest = request.mutate()
+                ServerHttpRequest mutatedRequest = sanitized.mutate()
                     .header("X-User-Id", claims.getSubject())
                     .header("X-User-Roles", String.join(",", roles))
                     .build();
 
-                return chain.filter(exchange.mutate().request(mutatedRequest).build());
+                return chain.filter(sanitizedExchange.mutate().request(mutatedRequest).build());
             });
     }
 

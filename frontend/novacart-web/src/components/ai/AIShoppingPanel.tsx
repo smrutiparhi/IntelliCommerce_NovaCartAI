@@ -16,10 +16,9 @@ import { useAIStore } from '../../stores/ai-store'
 import { ImageUploadModal } from './ImageUploadModal'
 
 const QUICK_PROMPTS = [
-  'Generate an image of puffer jacket with unique patterns',
-  'Denim Jacket',
-  'Purple Jacket',
-  'Leather Jacket',
+  'Recommend wireless headphones',
+  'What is the delivery policy?',
+  'What does the NOVA10 coupon do?',
 ]
 
 function citationHref(source: string) {

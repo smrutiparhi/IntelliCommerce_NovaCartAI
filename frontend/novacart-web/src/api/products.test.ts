@@ -19,4 +19,16 @@ describe('mapApiProduct', () => {
     expect(product.category).toBe('Accessories')
     expect(product.reviewsCount).toBe('1,280')
   })
+
+  it('repairs obsolete Amazon thumbnail transforms before rendering', () => {
+    const source: ProductApiModel = {
+      id: 'mongo-id', slug: 'india-b086wmscn3', sellerId: 'novacart-seed', title: 'boAt Airdopes 171', brand: 'boAt',
+      categorySlug: 'audio', priceInPaise: 119900, originalPriceInPaise: 599900,
+      description: 'Wireless earbuds.',
+      images: ['https://m.media-amazon.com/images/W/WEBP_402378-T2/images/I/41IAc+vLV7S._SY300_SX300_.jpg'],
+      tags: ['audio'], rating: 3.9, reviewCount: 47521, active: true,
+    }
+
+    expect(mapApiProduct(source).image).toBe('https://m.media-amazon.com/images/I/41IAc+vLV7S._SL600_.jpg')
+  })
 })

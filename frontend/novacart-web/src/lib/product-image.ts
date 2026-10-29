@@ -1,5 +1,21 @@
 import type { SyntheticEvent } from 'react'
 
+const AMAZON_IMAGE_ID = /\/images\/I\/([^.?/]+)/i
+
+/**
+ * Converts Amazon's fragile WEBP/thumbnail transforms into a stable CDN URL.
+ * It also repairs legacy rows already stored in MongoDB, without waiting for a
+ * catalogue re-import.
+ */
+export function normalizeProductImageUrl(value?: string | null) {
+  const url = value?.trim()
+  if (!url) return undefined
+  if (!/(media-amazon\.com|ssl-images-amazon\.com)/i.test(url)) return url
+
+  const imageId = url.match(AMAZON_IMAGE_ID)?.[1]
+  return imageId ? `https://m.media-amazon.com/images/I/${imageId}._SL600_.jpg` : url
+}
+
 export function productImageFallback(title: string, brand = 'NovaCart') {
   const initials = title.split(/\s+/).filter(Boolean).slice(0, 2).map((word) => word[0]?.toUpperCase()).join('') || 'N'
   const safeTitle = escapeXml(title.length > 34 ? `${title.slice(0, 31)}…` : title)
@@ -10,6 +26,16 @@ export function productImageFallback(title: string, brand = 'NovaCart') {
 
 export function replaceBrokenProductImage(event: SyntheticEvent<HTMLImageElement>, title: string, brand?: string) {
   const image = event.currentTarget
+
+  // A seller may still submit an old Amazon thumbnail URL. Try its stable form
+  // once before showing the final visual fallback.
+  const repaired = normalizeProductImageUrl(image.currentSrc || image.src)
+  if (repaired && repaired !== image.src && image.dataset.imageRepairAttempted !== 'true') {
+    image.dataset.imageRepairAttempted = 'true'
+    image.src = repaired
+    return
+  }
+
   image.onerror = null
   image.src = productImageFallback(title, brand)
 }

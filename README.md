@@ -22,23 +22,24 @@ Built as a 4-person team project, each member independently owning a vertical sl
 Three things this project is actually trying to prove, not just describe:
 
 1. **Real event-driven consistency** — the order flow is a genuine Saga with compensating transactions and a transactional outbox, not just "service A calls service B."
-2. **Grounded RAG that provably doesn't hallucinate** — retrieval-augmented answers with citations and a measured eval harness, not a vibes-based claim.
+2. **Grounded RAG with measurable checks** — retrieval-augmented answers with citations, refusal rules, and an evaluation harness.
 3. **A tool-calling AI agent with a real permission model** — the agent can *act* (cancel an order, check stock), fenced against prompt injection and privilege escalation, with every write confirmed before it executes.
 
 ## Status
 
-This is being built phase-by-phase, not all at once — see [`docs/PROGRESS.md`](docs/PROGRESS.md) for the live, authoritative status. As of the last update:
+The full local stack runs through Docker Compose. See [`docs/PROGRESS.md`](docs/PROGRESS.md) for phase history and [`docs/REVIEW_RUNBOOK.md`](docs/REVIEW_RUNBOOK.md) for a verified review sequence.
 
 | Area | Status |
 |---|---|
 | Requirements, architecture, database design, design system | ✅ Done |
-| Frontend shell (routing, theme, auth, all pages scaffolded) | ✅ Done |
+| Frontend storefront, account, checkout, seller, and AI pages | ✅ Done |
 | Platform infra — Eureka, Config Server, API Gateway | ✅ Done |
 | Auth service — register/login/refresh/logout/reset, RS256 JWT, rate limiting | ✅ Done |
-| Product, Inventory, Cart, Order, Payment, Kafka saga, AI Assistant | 🚧 Not started |
-| Docker, CI/CD, cloud deployment | 🚧 Not started / deferred |
+| Product, Inventory, Cart, Order, Payment, Kafka saga, AI Assistant | ✅ Running locally |
+| Docker Compose | ✅ Running locally |
+| Full CI/CD and cloud deployment | Deferred |
 
-Scope for the services not yet listed above was deliberately trimmed for a realistic build timeline — see [`docs/DEFERRED.md`](docs/DEFERRED.md) and [ADR-001](docs/DECISIONS.md) for exactly what and why.
+The local checkout uses payment simulation; real payment credentials and public deployment are outside the review scope. See [`docs/DEFERRED.md`](docs/DEFERRED.md) for the remaining work.
 
 ## Architecture
 
@@ -54,15 +55,15 @@ C4Context
 
   System(novacart, "NovaCart AI", "AI-powered multi-vendor marketplace")
 
-  System_Ext(razorpay, "Razorpay", "Payment gateway (test mode)")
-  System_Ext(atlas, "MongoDB Atlas", "Managed DB, Search, Vector Search")
+  System_Ext(payment, "Payment provider", "Local simulation; Razorpay optional")
+  System_Ext(mongo, "MongoDB", "Local Docker database")
   System_Ext(llm, "LLM Provider", "Powers the AI assistant's RAG + agent")
 
   Rel(customer, novacart, "Browses, buys, tracks orders, chats with AI assistant")
   Rel(seller, novacart, "Manages own products and stock")
   Rel(admin, novacart, "Monitors saga/order health, moderates")
-  Rel(novacart, razorpay, "Creates orders, verifies payments", "HTTPS + webhook")
-  Rel(novacart, atlas, "Reads/writes all service data", "MongoDB wire protocol")
+  Rel(novacart, payment, "Processes payments", "Simulation locally")
+  Rel(novacart, mongo, "Reads/writes service data", "MongoDB wire protocol")
   Rel(novacart, llm, "Generates grounded answers, calls tools", "HTTPS")
 ```
 
@@ -71,11 +72,12 @@ C4Context
 | Layer | Stack |
 |---|---|
 | Backend | Java 21, Spring Boot 3.3.13, Spring Cloud 2023.0.6, Spring Security, Spring Data MongoDB, Maven (multi-module, wrapper committed) |
-| Frontend | React 18, TypeScript 5, Vite, Tailwind CSS 3, React Router 6, TanStack Query 5, Zustand, Framer Motion, react-hook-form + Zod |
-| Data | MongoDB (Atlas in production, local Docker for dev), Redis |
+| Frontend | React 19, TypeScript 6, Vite 8, Tailwind CSS 3, React Router 6, TanStack Query 5, Zustand, Framer Motion, react-hook-form + Zod |
+| Data | MongoDB, PostgreSQL, Redis |
 | Infra | Eureka (discovery), Spring Cloud Config (centralized config, native/filesystem-backed), Spring Cloud Gateway (edge) |
 | Auth | RS256 JWT, opaque hashed refresh tokens with rotation + reuse detection, BCrypt-12 |
-| Planned, not yet built | Apache Kafka (saga backbone), Razorpay (payments), an LLM provider (AI assistant), Docker Compose, CI/CD |
+| Commerce and AI | Kafka saga, local payment simulation (optional Razorpay integration), Gemini-backed RAG, Docker Compose |
+| Deferred | Public cloud deployment, real email delivery, full CI/CD |
 
 ## Repository Structure
 
@@ -87,7 +89,14 @@ novacart-ai/
 │   ├── config-server/
 │   └── api-gateway/
 ├── services/
-│   └── auth-service/        # the only business service built so far
+│   ├── auth-service/
+│   ├── product-service/     # catalogue and reviews
+│   ├── inventory-service/
+│   ├── cart-service/
+│   ├── order-service/
+│   ├── payment-service/
+│   ├── notification-service/
+│   └── ai-assistant-service/
 ├── shared/
 │   └── novacart-common/     # event envelope + API response DTOs only, no business logic
 ├── frontend/
@@ -100,7 +109,7 @@ novacart-ai/
 
 ## Getting Started
 
-**Prerequisites:** JDK 21, Docker, Node.js 18+.
+**Prerequisite for the local review:** Docker Desktop running.
 
 **1. Generate a JWT keypair** (gitignored — every clone needs its own):
 ```bash
@@ -109,36 +118,20 @@ openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out keys/jwt-priva
 openssl rsa -pubout -in keys/jwt-private-key.pem -out keys/jwt-public-key.pem
 ```
 
-**2. Start MongoDB and Redis:**
+**2. Start the complete local stack:**
 ```bash
-docker run -d --name novacart-mongo -p 27017:27017 mongo:7
-docker run -d --name novacart-redis -p 6379:6379 redis:7-alpine
+docker compose -f docker-compose.yml --profile infra --profile platform --profile backend --profile frontend up -d
 ```
 
-**3. Build everything:**
-```bash
-./mvnw clean install
-```
+Open `http://localhost:3000` for the app and `http://localhost:8025` for locally captured password-reset email. Eureka is at `http://localhost:8761`; the gateway routes API calls at `http://localhost:8080/api/v1/*`. Use the [review runbook](docs/REVIEW_RUNBOOK.md) for the tested demo path.
 
-**4. Start the backend, in order** (each needs the previous one healthy):
-```bash
-export JWT_PRIVATE_KEY_PATH=/absolute/path/to/keys/jwt-private-key.pem
-export JWT_PUBLIC_KEY_PATH=/absolute/path/to/keys/jwt-public-key.pem
+### Optional Gemini AI provider
 
-java -jar infra/eureka-server/target/eureka-server-0.1.0-SNAPSHOT.jar &     # :8761
-java -jar infra/config-server/target/config-server-0.1.0-SNAPSHOT.jar &    # :8888
-java -jar infra/api-gateway/target/api-gateway-0.1.0-SNAPSHOT.jar &        # :8080
-java -jar services/auth-service/target/auth-service-0.1.0-SNAPSHOT.jar &   # :8081
-```
+Nova uses a local retrieval and extractive-answer fallback when no model key is set. To use a Google AI Studio Gemini API key, copy `.env.example` to `.env`, set `GEMINI_API_KEY` there, and restart the AI service with all Compose profiles enabled. Gemini takes precedence if both Gemini and OpenAI keys are configured. Keep `.env` private; use a secret manager for deployment. The AI service re-embeds its catalogue after startup when the provider changes. Check the admin analytics page for `Gemini configured`, a recent index time, and no indexing error before evaluating answers.
 
-**5. Start the frontend:**
-```bash
-cd frontend/novacart-web
-npm install
-npm run dev   # :5173
-```
+### Local password reset
 
-Eureka dashboard: `http://localhost:8761`. Everything routes through the Gateway at `http://localhost:8080/api/v1/*`.
+The Compose stack captures reset emails in Mailpit at `http://localhost:8025`. On the sign-in page, choose **Forgot password**, enter the same email used to register, then open the reset link in Mailpit. The link expires after 15 minutes and works once. For deployment, configure the SMTP and public frontend URL variables in `.env.example` with real values; Mailpit only captures messages locally and does not deliver them to external inboxes.
 
 ### Port map
 

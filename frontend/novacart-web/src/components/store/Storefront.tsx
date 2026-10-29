@@ -41,7 +41,7 @@ export function Storefront({ member = false }: { member?: boolean }) {
         <div className="nc-hero-actions">
           <a href="#shop-products" className="nc-primary">Explore the collection <ArrowUpRight size={16} /></a>
           <button type="button" onClick={openAssistant} className="nc-secondary nc-hero-ai" aria-expanded={isPanelOpen} aria-controls="nova-shopping-assistant"><Sparkles size={16} aria-hidden="true" /> Ask Nova AI</button>
-          <Link to="/search?q=New" className="nc-text-link">Just landed <ArrowRight size={14} /></Link>
+          <Link to="/search?q=New" className="nc-tertiary">Just landed <ArrowRight size={16} /></Link>
         </div>
         <div className="nc-hero-foot"><span><Leaf size={16} /></span> A fresh perspective on the things you love.</div>
       </div>

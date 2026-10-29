@@ -1,6 +1,6 @@
 import { apiClient } from '../lib/api-client'
 import { PRODUCTS, type StoreProduct } from '../data/store-products'
-import { productImageFallback } from '../lib/product-image'
+import { normalizeProductImageUrl, productImageFallback } from '../lib/product-image'
 
 export interface ProductApiModel {
   id: string
@@ -114,7 +114,7 @@ export function mapApiProduct(product: ProductApiModel): StoreProduct {
     originalPriceINR: product.originalPriceInPaise ? Math.round(product.originalPriceInPaise / 100) : undefined,
     rating: product.rating,
     reviewsCount: product.reviewCount.toLocaleString('en-IN'),
-    image: product.images[0] || productImageFallback(product.title, product.brand),
+    image: normalizeProductImageUrl(product.images[0]) || productImageFallback(product.title, product.brand),
     category: titleCase(product.categorySlug),
     tags: product.tags ?? [],
     badge: product.badge ?? undefined,
@@ -127,13 +127,11 @@ export async function getCatalogue(): Promise<CatalogueResult> {
   try {
     const response = await fetchAllProducts()
     const remote = response.products.map(mapApiProduct)
-    if (remote.length === 0) return { products: PRODUCTS, source: 'fallback', total: PRODUCTS.length }
+    if (remote.length === 0) return { products: [], source: 'api', total: 0 }
 
-    // The local seed remains visible until every listing has migrated to MongoDB.
-    // Remote records win by slug, so the transition never duplicates a product.
-    const merged = new Map(PRODUCTS.map((product) => [product.id, product]))
-    remote.forEach((product) => merged.set(product.id, product))
-    return { products: [...merged.values()], source: 'api', total: response.total }
+    // A healthy backend is authoritative. Never mix the fictional offline design
+    // fixtures into the real catalogue returned by Product Service.
+    return { products: remote, source: 'api', total: response.total }
   } catch {
     return { products: PRODUCTS, source: 'fallback', total: PRODUCTS.length }
   }

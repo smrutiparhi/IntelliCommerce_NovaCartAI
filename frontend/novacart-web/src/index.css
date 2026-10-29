@@ -24,6 +24,12 @@
   --nc-radius-sm: 0.875rem;
   --nc-radius-md: 1.25rem;
   --nc-radius-lg: 2rem;
+  --nc-radius-control: 0.75rem;
+  --nc-radius-card: 1rem;
+  --nc-radius-pill: 999px;
+  --nc-font-caption: 0.75rem;
+  --nc-font-body: 0.875rem;
+  --nc-font-ui: 1rem;
   --nc-shadow: 0 12px 45px rgba(35, 40, 20, 0.06);
   --nc-motion-fast: 180ms;
   --nc-motion: 320ms;
@@ -58,7 +64,7 @@
 
 @layer components {
   .nc-shell { @apply mx-auto w-full max-w-shell px-5 sm:px-8 lg:px-10; }
-  .nc-label { @apply text-[10px] font-bold uppercase tracking-[.22em] text-violet-600 dark:text-[#dfff36]; }
+  .nc-label { @apply text-xs font-bold tracking-[.08em] text-violet-600 dark:text-[#dfff36]; }
   .nc-panel { @apply border bg-[var(--nc-surface)]; }
   .nc-card { @apply border bg-[var(--nc-surface)] shadow-card transition duration-300 hover:bg-[var(--nc-surface-raised)]; }
   .nc-icon-button { @apply grid h-10 w-10 shrink-0 place-items-center rounded-full border border-black/10 bg-black/[.035] text-slate-700 transition duration-200 hover:border-black/20 hover:bg-black/[.08] hover:text-black dark:border-white/10 dark:bg-white/[.045] dark:text-slate-200 dark:hover:border-white/20 dark:hover:bg-white/10 dark:hover:text-white; }

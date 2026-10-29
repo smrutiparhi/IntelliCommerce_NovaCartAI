@@ -26,7 +26,7 @@ services:
     container_name: novacart-mongo
     profiles: [infra]
     ports:
-      - "27017:27017"
+      - "127.0.0.1:27017:27017"
     environment:
       MONGO_INITDB_ROOT_USERNAME: novacart_root
       MONGO_INITDB_ROOT_PASSWORD: novacart_root_pw
@@ -46,7 +46,7 @@ services:
     container_name: novacart-redis
     profiles: [infra]
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     networks:
       - novacart-net
     healthcheck:
@@ -63,7 +63,7 @@ services:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
     ports:
-      - "2181:2181"
+      - "127.0.0.1:2181:2181"
     networks:
       - novacart-net
 
@@ -74,8 +74,8 @@ services:
     depends_on:
       - zookeeper
     ports:
-      - "9092:9092"
-      - "29092:29092"
+      - "127.0.0.1:9092:9092"
+      - "127.0.0.1:29092:29092"
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
@@ -97,7 +97,7 @@ services:
     container_name: novacart-kafka-ui
     profiles: [infra]
     ports:
-      - "8099:8080"
+      - "127.0.0.1:8099:8080"
     environment:
       KAFKA_CLUSTERS_0_NAME: novacart-cluster
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
@@ -113,7 +113,7 @@ services:
     container_name: novacart-postgres
     profiles: [infra]
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     environment:
       POSTGRES_USER: novacart
       POSTGRES_PASSWORD: novacart_password
@@ -139,7 +139,7 @@ services:
     container_name: novacart-eureka
     profiles: [platform]
     ports:
-      - "8761:8761"
+      - "127.0.0.1:8761:8761"
     depends_on:
       mongodb:
         condition: service_healthy
@@ -161,7 +161,7 @@ services:
     container_name: novacart-config
     profiles: [platform]
     ports:
-      - "8888:8888"
+      - "127.0.0.1:8888:8888"
     depends_on:
       eureka-server:
         condition: service_healthy
@@ -181,7 +181,7 @@ services:
     container_name: novacart-gateway
     profiles: [platform]
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     environment:
       SPRING_CONFIG_IMPORT: "configserver:http://config-server:8888"
       EUREKA_DEFAULT_ZONE: "http://eureka-server:8761/eureka/"
@@ -208,12 +208,20 @@ services:
     container_name: novacart-auth
     profiles: [platform]
     ports:
-      - "8081:8081"
+      - "127.0.0.1:8081:8081"
     environment:
       SPRING_CONFIG_IMPORT: "configserver:http://config-server:8888"
       EUREKA_DEFAULT_ZONE: "http://eureka-server:8761/eureka/"
       SPRING_DATA_MONGODB_URI: "mongodb://auth_svc:auth_svc_pw@mongodb:27017/auth_db"
       REDIS_HOST: redis
+      SPRING_MAIL_HOST: "${SPRING_MAIL_HOST:-mailpit}"
+      SPRING_MAIL_PORT: "${SPRING_MAIL_PORT:-1025}"
+      SPRING_MAIL_USERNAME: "${SPRING_MAIL_USERNAME:-}"
+      SPRING_MAIL_PASSWORD: "${SPRING_MAIL_PASSWORD:-}"
+      SMTP_AUTH: "${SMTP_AUTH:-false}"
+      SMTP_STARTTLS_ENABLE: "${SMTP_STARTTLS_ENABLE:-false}"
+      APP_FRONTEND_URL: "${APP_FRONTEND_URL:-http://localhost:3000}"
+      APP_MAIL_FROM: "${APP_MAIL_FROM:-no-reply@novacart.local}"
       JWT_PRIVATE_KEY_PATH: /run/secrets/jwt_private_key
       JWT_PUBLIC_KEY_PATH:  /run/secrets/jwt_public_key
     secrets:
@@ -226,6 +234,17 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      mailpit:
+        condition: service_started
+    networks:
+      - novacart-net
+
+  mailpit:
+    image: axllent/mailpit:v1.27.4
+    container_name: novacart-mailpit
+    profiles: [infra]
+    ports:
+      - "127.0.0.1:8025:8025"
     networks:
       - novacart-net
 
@@ -239,7 +258,7 @@ services:
     container_name: novacart-product
     profiles: [backend]                     # won't start unless --profile backend is passed
     ports:
-      - "8082:8082"
+      - "127.0.0.1:8082:8082"
     environment:
       SPRING_CONFIG_IMPORT: "configserver:http://config-server:8888"
       SPRING_DATA_MONGODB_URI: "mongodb://product_svc:product_svc_pw@mongodb:27017/product_db"
@@ -261,7 +280,7 @@ services:
     container_name: novacart-cart
     profiles: [backend]
     ports:
-      - "8084:8084"
+      - "127.0.0.1:8084:8084"
     environment:
       SPRING_CONFIG_IMPORT: "configserver:http://config-server:8888"
       SPRING_REDIS_HOST: redis
@@ -284,7 +303,7 @@ services:
     container_name: novacart-inventory
     profiles: [backend]
     ports:
-      - "8083:8083"
+      - "127.0.0.1:8083:8083"
     environment:
       SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/inventory_db"
       SPRING_DATASOURCE_USERNAME: novacart
@@ -309,7 +328,7 @@ services:
     container_name: novacart-order
     profiles: [backend]
     ports:
-      - "8085:8085"
+      - "127.0.0.1:8085:8085"
     environment:
       SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/order_db"
       SPRING_DATASOURCE_USERNAME: novacart
@@ -335,7 +354,7 @@ services:
     container_name: novacart-payment
     profiles: [backend]
     ports:
-      - "8086:8086"
+      - "127.0.0.1:8086:8086"
     environment:
       SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/payment_db"
       SPRING_DATASOURCE_USERNAME: novacart
@@ -364,7 +383,7 @@ services:
     container_name: novacart-notification
     profiles: [backend]
     ports:
-      - "8087:8087"
+      - "127.0.0.1:8087:8087"
     environment:
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/notification_db"
@@ -388,8 +407,6 @@ services:
     image: novacart/ai-assistant-service:local
     container_name: novacart-ai
     profiles: [backend]
-    ports:
-      - "8089:8089"
     environment:
       SPRING_CONFIG_IMPORT: "configserver:http://config-server:8888"
       NOVACART_PRODUCT_SERVICE_URL: "http://product-service:8082"
@@ -398,7 +415,14 @@ services:
       OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
       OPENAI_RESPONSE_MODEL: "${OPENAI_RESPONSE_MODEL:-gpt-4.1-mini}"
       OPENAI_EMBEDDING_MODEL: "${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}"
+      GEMINI_API_KEY: "${GEMINI_API_KEY:-}"
+      GEMINI_BASE_URL: "${GEMINI_BASE_URL:-https://generativelanguage.googleapis.com}"
+      GEMINI_RESPONSE_MODEL: "${GEMINI_RESPONSE_MODEL:-gemini-3.8-flash}"
+      GEMINI_EMBEDDING_MODEL: "${GEMINI_EMBEDDING_MODEL:-gemini-embedding-001}"
       EUREKA_URI: "http://eureka-server:8761/eureka/"
+      JWT_PUBLIC_KEY_PATH: /run/secrets/jwt_public_key
+    secrets:
+      - jwt_public_key
     depends_on:
       api-gateway:
         condition: service_healthy
@@ -415,6 +439,8 @@ services:
     build:
       context: .
       dockerfile: frontend/novacart-web/Dockerfile
+      args:
+        VITE_RESET_INBOX_URL: "http://localhost:8025"
     image: novacart/frontend:local
     container_name: novacart-frontend
     profiles: [frontend]

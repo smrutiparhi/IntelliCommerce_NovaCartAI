@@ -19,6 +19,8 @@ management:
         include: health,info,metrics,prometheus
 
 novacart:
+  jwt:
+    public-key-path: ${JWT_PUBLIC_KEY_PATH:/run/secrets/jwt_public_key}
   product-service-url: ${NOVACART_PRODUCT_SERVICE_URL:http://localhost:8082}
   order-service-url: ${NOVACART_ORDER_SERVICE_URL:http://localhost:8085}
   rag:
@@ -31,3 +33,8 @@ novacart:
     base-url: ${OPENAI_BASE_URL:https://api.openai.com}
     response-model: ${OPENAI_RESPONSE_MODEL:gpt-4.1-mini}
     embedding-model: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
+  gemini:
+    api-key: ${GEMINI_API_KEY:}
+    base-url: ${GEMINI_BASE_URL:https://generativelanguage.googleapis.com}
+    response-model: ${GEMINI_RESPONSE_MODEL:gemini-3.8-flash}
+    embedding-model: ${GEMINI_EMBEDDING_MODEL:gemini-embedding-001}

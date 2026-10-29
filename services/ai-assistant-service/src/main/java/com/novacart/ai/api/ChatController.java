@@ -3,7 +3,9 @@ package com.novacart.ai.api;
 import com.novacart.ai.service.GroundedAssistantService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.time.Instant;
@@ -17,19 +19,19 @@ public class ChatController {
 
     @PostMapping("/chat")
     public ChatResponse chat(@Valid @RequestBody ChatRequest request,
-                             @RequestHeader(value = "X-User-Id", required = false) String userId) {
+                             @RequestAttribute("ai.userId") String userId) {
         return assistant.answer(request.message(), userId);
     }
 
     @PostMapping("/cancel/propose")
     public GroundedAssistantService.CancellationProposal proposeCancel(@Valid @RequestBody CancelRequest request,
-                                                                         @RequestHeader(value = "X-User-Id", required = false) String userId) {
+                                                                         @RequestAttribute("ai.userId") String userId) {
         return assistant.proposeCancellation(request.orderId(), userId);
     }
 
     @PostMapping("/cancel/confirm")
     public GroundedAssistantService.CancellationResult confirmCancel(@Valid @RequestBody ConfirmCancelRequest request,
-                                                                       @RequestHeader(value = "X-User-Id", required = false) String userId) {
+                                                                       @RequestAttribute("ai.userId") String userId) {
         return assistant.confirmCancellation(request.confirmationToken(), userId);
     }
 
@@ -40,26 +42,26 @@ public class ChatController {
 
     @GetMapping("/analytics")
     public GroundedAssistantService.AnalyticsSummary analytics(
-        @RequestHeader(value = "X-User-Roles", required = false) String roles) {
+        @RequestAttribute("ai.roles") String roles) {
         return assistant.analytics(roles);
     }
 
     @PostMapping("/feedback")
     public void feedback(@Valid @RequestBody FeedbackRequest request,
-                         @RequestHeader(value = "X-User-Id", required = false) String userId) {
+                         @RequestAttribute("ai.userId") String userId) {
         assistant.recordFeedback(request.messageId(), request.helpful(), userId);
     }
 
     @GetMapping("/rag/status")
     public com.novacart.ai.service.RagService.IndexStatus ragStatus(
-        @RequestHeader(value = "X-User-Roles", required = false) String roles) {
+        @RequestAttribute("ai.roles") String roles) {
         requireAdmin(roles);
         return rag.status();
     }
 
     @PostMapping("/rag/reindex")
     public com.novacart.ai.service.RagService.IndexStatus reindex(
-        @RequestHeader(value = "X-User-Roles", required = false) String roles) {
+        @RequestAttribute("ai.roles") String roles) {
         requireAdmin(roles);
         return rag.refresh();
     }
@@ -73,7 +75,8 @@ public class ChatController {
     }
 
     private void requireAdmin(String roles) {
-        if (roles == null || !roles.contains("ROLE_ADMIN")) throw new IllegalArgumentException("Administrator role is required");
+        if (roles == null || !List.of(roles.split(",")).contains("ROLE_ADMIN"))
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Administrator role is required");
     }
 
     public record ChatRequest(@NotBlank String message) {}

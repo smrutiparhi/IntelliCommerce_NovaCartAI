@@ -78,13 +78,27 @@ public class RagService {
                 if (next != null && next.content() != null) drafts.addAll(next.content().stream().map(this::productDraft).toList());
             }
             drafts = chunkDrafts(drafts);
-            List<List<Double>> embeddings = openAi.embedAll(drafts.stream().map(Draft::content).toList());
+            Map<String, KnowledgeChunk> existing = chunks.findAll().stream()
+                .collect(Collectors.toMap(KnowledgeChunk::id, chunk -> chunk));
+            List<Draft> changed = drafts.stream().filter(draft -> {
+                KnowledgeChunk old = existing.get(draft.sourceType() + ":" + draft.sourceId());
+                return old == null || !Objects.equals(old.content(), draft.content())
+                    || !Objects.equals(old.embeddingModel(), openAi.embeddingModel()) || old.embedding() == null;
+            }).toList();
+            List<List<Double>> newEmbeddings = openAi.embedAll(changed.stream().map(Draft::content).toList());
+            Map<String, List<Double>> embeddingById = new HashMap<>();
+            for (int i = 0; i < changed.size(); i++) {
+                Draft draft = changed.get(i);
+                embeddingById.put(draft.sourceType() + ":" + draft.sourceId(), newEmbeddings.get(i));
+            }
             Instant now = Instant.now();
             List<KnowledgeChunk> indexed = new ArrayList<>(drafts.size());
-            for (int i = 0; i < drafts.size(); i++) {
-                Draft draft = drafts.get(i);
+            for (Draft draft : drafts) {
+                String id = draft.sourceType() + ":" + draft.sourceId();
+                List<Double> embedding = embeddingById.get(id);
+                if (embedding == null) embedding = existing.get(id).embedding();
                 indexed.add(new KnowledgeChunk(draft.sourceType() + ":" + draft.sourceId(), draft.sourceType(), draft.sourceId(),
-                    draft.title(), draft.content(), embeddings.get(i), openAi.embeddingModel(), draft.url(), now));
+                    draft.title(), draft.content(), embedding, openAi.embeddingModel(), draft.url(), now));
             }
             chunks.deleteAll();
             chunks.saveAll(indexed);
@@ -109,7 +123,7 @@ public class RagService {
         if (evidence.isEmpty()) return Optional.empty();
         String context = evidence.stream().map(item -> "[" + item.chunk().sourceType() + "/" + item.chunk().sourceId() + "] "
             + item.chunk().title() + "\n" + item.chunk().content()).collect(Collectors.joining("\n\n"));
-        String mode = openAi.enabled() ? "rag-openai-v1" : "rag-local-vector-v1";
+        String mode = openAi.enabled() ? "rag-" + openAi.provider() + "-v1" : "rag-local-vector-v1";
         String answer;
         try { answer = openAi.generate(question, context).orElseGet(() -> extractiveAnswer(evidence)); }
         catch (Exception ex) {
@@ -117,9 +131,12 @@ public class RagService {
             answer = extractiveAnswer(evidence);
             mode = "rag-extractive-fallback-v1";
         }
-        List<ChatController.Citation> citations = evidence.stream().map(item -> new ChatController.Citation(
+        Set<String> citedSources = new HashSet<>();
+        List<ChatController.Citation> citations = evidence.stream()
+            .filter(item -> citedSources.add(item.chunk().url()))
+            .map(item -> new ChatController.Citation(
             item.chunk().sourceId(), item.chunk().title(), item.chunk().url())).toList();
-        metrics.counter("novacart.ai.rag.answers", "provider", openAi.enabled() ? "openai" : "local").increment();
+        metrics.counter("novacart.ai.rag.answers", "provider", openAi.provider()).increment();
         try { runs.save(new AgentRun(UUID.randomUUID().toString(), userId, question, mode, citations.size(),
             (System.nanoTime() - started) / 1_000_000, "SUCCESS", Instant.now())); }
         catch (Exception ignored) { metrics.counter("novacart.ai.rag.audit.failures").increment(); }
@@ -153,6 +170,18 @@ public class RagService {
             .sorted(Comparator.comparingDouble(ScoredChunk::score).reversed())
             .toList();
         if (ranked.isEmpty()) return List.of();
+        if (openAi.enabled()) {
+            boolean policyQuery = tokens(query).stream().anyMatch(Set.of(
+                "policy", "delivery", "shipping", "coupon", "refund", "cancel", "cancellation")::contains);
+            Set<String> policyFocus = new HashSet<>(tokens(query));
+            policyFocus.remove("policy");
+            List<ScoredChunk> relevant = ranked.stream().filter(item ->
+                (policyQuery ? "POLICY" : "PRODUCT").equals(item.chunk().sourceType())
+                    && titleMatches(query, item.chunk()) > 0
+                    && (!policyQuery || policyFocus.isEmpty()
+                        || policyFocus.stream().anyMatch(tokens(item.chunk().title())::contains))).toList();
+            if (!relevant.isEmpty()) ranked = relevant;
+        }
         if (openAi.enabled() && ranked.getFirst().score() < noAnswerScore) {
             metrics.counter("novacart.ai.rag.no_answer").increment();
             return List.of();
@@ -163,7 +192,8 @@ public class RagService {
     }
 
     public IndexStatus status() {
-        return new IndexStatus(chunks.count(), openAi.embeddingModel(), openAi.responseModel(), openAi.enabled(), indexing.get(), lastIndexedAt, lastError);
+        return new IndexStatus(chunks.count(), openAi.embeddingModel(), openAi.responseModel(), openAi.enabled(),
+            openAi.provider(), indexing.get(), lastIndexedAt, lastError);
     }
 
     private ProductPage productPage(int page) {
@@ -212,18 +242,26 @@ public class RagService {
     }
 
     private long titleMatches(String query, KnowledgeChunk chunk) {
-        Set<String> terms = tokens(query).stream().collect(Collectors.toCollection(LinkedHashSet::new));
+        String productPhrase = query.split("(?i)\\b(?:for|with|under|below|around|that|which)\\b", 2)[0];
+        Set<String> terms = tokens(query);
+        Set<String> productTerms = tokens(productPhrase);
         Set<String> titleTerms = tokens(chunk.title());
-        if (terms.isEmpty()) return 0;
-        String headTerm = terms.stream().reduce((first, last) -> last).orElse("");
-        return titleTerms.contains(headTerm) ? terms.stream().filter(titleTerms::contains).count() : 0;
+        if (productTerms.isEmpty()) return 0;
+        String headTerm = productTerms.stream().reduce((first, last) -> last).orElse("");
+        boolean matchesHead = titleTerms.contains(headTerm)
+            || (Set.of("headphone", "headphones", "earphone", "earphones", "earbuds").contains(headTerm)
+                && titleTerms.stream().anyMatch(Set.of("headphone", "headphones", "earphone", "earphones", "earbuds")::contains));
+        if (!matchesHead) return 0;
+        if (terms.contains("wireless") && !titleTerms.contains("wireless") && !titleTerms.contains("bluetooth")) return 0;
+        if (terms.contains("wired") && !titleTerms.contains("wired")) return 0;
+        return terms.stream().filter(titleTerms::contains).count();
     }
 
     private Set<String> tokens(String text) {
         if (text == null) return Set.of();
-        Set<String> stopWords = Set.of("with", "from", "that", "this", "have", "your", "what", "which", "show", "find", "want", "need", "good", "best", "for", "the", "and");
+        Set<String> stopWords = Set.of("with", "from", "that", "this", "have", "your", "what", "which", "show", "find", "want", "need", "good", "best", "for", "the", "and", "recommend", "suggest", "looking", "please", "some", "any");
         return Arrays.stream(text.toLowerCase(Locale.ROOT).split("[^a-z0-9]+"))
-            .filter(token -> token.length() > 2 && !stopWords.contains(token)).collect(Collectors.toSet());
+            .filter(token -> token.length() > 2 && !stopWords.contains(token)).collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     private double cosine(List<Double> left, List<Double> right) {
@@ -247,6 +285,6 @@ public class RagService {
                            String description, List<String> tags, Double rating) {}
     public record ScoredChunk(KnowledgeChunk chunk, double score, double lexicalScore) {}
     public record RagAnswer(String answer, List<ChatController.Citation> citations, String mode) {}
-    public record IndexStatus(long chunks, String embeddingModel, String responseModel, boolean openAiEnabled,
-                              boolean indexing, Instant lastIndexedAt, String lastError) {}
+    public record IndexStatus(long chunks, String embeddingModel, String responseModel, boolean modelEnabled,
+                              String provider, boolean indexing, Instant lastIndexedAt, String lastError) {}
 }

@@ -13,6 +13,7 @@ const schema = z.object({ email: z.string().email('Enter a valid email address')
 type Form = z.infer<typeof schema>
 
 export function ForgotPasswordPage() {
+  const localInboxUrl = import.meta.env.VITE_RESET_INBOX_URL
   const {
     register,
     handleSubmit,
@@ -24,6 +25,14 @@ export function ForgotPasswordPage() {
   if (mutation.isSuccess) {
     return (
       <AuthLayout title="Check your email" subtitle="If that address exists, we've sent a reset link — it expires in 15 minutes.">
+        {localInboxUrl && (
+          <p className="mb-4 text-body-sm text-slate-600 dark:text-slate-300">
+            This local setup captures reset emails in the{' '}
+            <a href={localInboxUrl} target="_blank" rel="noreferrer" className="font-medium text-primary-600 hover:underline">
+              development inbox
+            </a>.
+          </p>
+        )}
         <Link to="/login" className="text-body-sm font-medium text-primary-600 hover:underline">
           Back to sign in
         </Link>

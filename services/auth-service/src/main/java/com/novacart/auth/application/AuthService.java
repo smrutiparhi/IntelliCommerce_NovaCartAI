@@ -1,12 +1,17 @@
 package com.novacart.auth.application;
 
 import java.time.Instant;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Set;
 import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 
 import com.novacart.auth.api.dto.LoginRequest;
@@ -38,6 +43,9 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final TokenBlocklistService blocklistService;
+    private final JavaMailSender mailSender;
+    private final String frontendUrl;
+    private final String mailFrom;
 
     public AuthService(
         UserRepository userRepository,
@@ -45,7 +53,10 @@ public class AuthService {
         PasswordResetTokenRepository passwordResetTokenRepository,
         PasswordEncoder passwordEncoder,
         JwtTokenProvider jwtTokenProvider,
-        TokenBlocklistService blocklistService
+        TokenBlocklistService blocklistService,
+        JavaMailSender mailSender,
+        @Value("${app.frontend-url}") String frontendUrl,
+        @Value("${app.mail-from}") String mailFrom
     ) {
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
@@ -53,6 +64,9 @@ public class AuthService {
         this.passwordEncoder = passwordEncoder;
         this.jwtTokenProvider = jwtTokenProvider;
         this.blocklistService = blocklistService;
+        this.mailSender = mailSender;
+        this.frontendUrl = frontendUrl;
+        this.mailFrom = mailFrom;
     }
 
     public AuthResult register(RegisterRequest request) {
@@ -141,11 +155,21 @@ public class AuthService {
                 .used(false)
                 .build();
             passwordResetTokenRepository.save(resetToken);
-
-            // Notification service is a logged-simulation stub for now (DEFERRED.md) —
-            // this log line IS the "email" until real sending exists. Never log a raw
-            // token once real email delivery replaces this.
-            log.info("[DEV] Password reset requested for {} — reset link token: {}", user.getEmail(), rawToken);
+            String link = frontendUrl.replaceAll("/+$", "") + "/reset-password?token="
+                + URLEncoder.encode(rawToken, StandardCharsets.UTF_8);
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setFrom(mailFrom);
+            message.setTo(user.getEmail());
+            message.setSubject("Reset your NovaCart password");
+            message.setText("Use this link to reset your NovaCart password. It expires in 15 minutes.\n\n"
+                + link + "\n\nIf you did not request this, you can ignore this email.");
+            try {
+                mailSender.send(message);
+            } catch (RuntimeException ex) {
+                passwordResetTokenRepository.delete(resetToken);
+                log.error("Password reset email delivery failed ({})", ex.getClass().getSimpleName());
+                throw ex;
+            }
         });
         // Same response whether or not the email exists — don't leak account existence.
     }

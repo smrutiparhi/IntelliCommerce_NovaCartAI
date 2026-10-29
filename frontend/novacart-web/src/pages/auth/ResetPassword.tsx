@@ -36,7 +36,7 @@ export function ResetPasswordPage() {
 
   const mutation = useMutation({
     mutationFn: (data: Form) => resetPassword(token ?? '', data.password),
-    onSuccess: () => navigate('/login', { replace: true }),
+    onSuccess: () => navigate('/login', { replace: true, state: { passwordReset: true } }),
     onError: (error) => {
       const message = isApiError(error) ? error.response?.data.error.message : 'This reset link is invalid or has expired.'
       setError('root', { message: message ?? 'Reset failed' })

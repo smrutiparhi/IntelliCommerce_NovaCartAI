@@ -2,7 +2,10 @@ import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios'
 import { useAuthStore } from '../stores/auth-store'
 import type { ApiError, ApiResponse } from '../types/api'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080'
+// Use the current origin by default. Vite proxies /api during local development,
+// and the production nginx container proxies it to the API gateway. Keeping the
+// browser request same-origin avoids hostname-specific CORS failures.
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 
 export const apiClient = axios.create({
   baseURL: `${API_BASE_URL}/api/v1`,
@@ -48,7 +51,10 @@ apiClient.interceptors.response.use(
   async (error: AxiosError<ApiError>) => {
     const original = error.config as RetriableConfig | undefined
 
-    if (error.response?.status === 401 && original && !original._retried) {
+    // A failed login or reset is the result of that action, not an expired app session.
+    // Refreshing here makes an extra auth request and can trip the login rate limit.
+    if (error.response?.status === 401 && original && !original._retried
+      && !original.url?.startsWith('/auth/')) {
       original._retried = true
       refreshPromise ??= silentRefresh().finally(() => {
         refreshPromise = null

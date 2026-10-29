@@ -66,8 +66,10 @@ export function ProductCard({ product, stock, index = 0 }: { product: StoreProdu
       <div className="nc-product-image">
         <Link to={`/products/${product.id}`} tabIndex={-1} aria-hidden="true"><img src={product.image} alt="" loading="lazy" onError={(event) => replaceBrokenProductImage(event,product.title,product.brand)} /></Link>
         {(product.badge || discount > 0) && <span className="nc-product-badge">{product.badge || `${discount}% off`}</span>}
-        <button type="button" onClick={() => toggleWishlist(product.id)} aria-label={`${isSaved ? 'Remove' : 'Save'} ${product.title}${isSaved ? ' from wishlist' : ' to wishlist'}`} aria-pressed={isSaved} className="nc-heart"><Heart size={14} fill={isSaved ? 'currentColor' : 'none'} /></button>
-        <button type="button" className="nc-product-quick" onClick={() => setQuickViewOpen(true)} aria-label={`Quick view ${product.title}`}><Eye size={12} /> Quick look</button>
+        <div className="nc-product-secondary-actions" role="group" aria-label="Product actions">
+          <button type="button" onClick={() => toggleWishlist(product.id)} aria-label={`${isSaved ? 'Remove' : 'Save'} ${product.title}${isSaved ? ' from wishlist' : ' to wishlist'}`} aria-pressed={isSaved} className="nc-heart" title={isSaved ? 'Remove from wishlist' : 'Save to wishlist'}><Heart size={16} fill={isSaved ? 'currentColor' : 'none'} /></button>
+          <button type="button" className="nc-product-quick" onClick={() => setQuickViewOpen(true)} aria-label={`Quick view ${product.title}`} title="Quick view"><Eye size={16} /></button>
+        </div>
       </div>
       <div className="nc-product-details">
         <div className="nc-product-meta"><span className="truncate">{product.brand}</span><span className="nc-product-rating"><Star />{product.rating}<span className="hidden sm:inline">({product.reviewsCount})</span></span></div>

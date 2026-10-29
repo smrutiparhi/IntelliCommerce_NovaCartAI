@@ -63,7 +63,7 @@ public class CatalogSeedConfig {
             ? item.photo()
             : "https://images.unsplash.com/" + item.photo() + "?auto=format&fit=crop&w=1200&q=85");
         p.tags = item.tags(); p.badge = item.badge(); p.delivery = "Free delivery in 2 days"; p.rating = item.rating();
-        p.reviewCount = 0; p.active = true; p.createdAt = p.createdAt == null ? now : p.createdAt; p.updatedAt = now;
+        p.reviewCount = item.reviewCount(); p.active = true; p.createdAt = p.createdAt == null ? now : p.createdAt; p.updatedAt = now;
     }
 
     private List<Seed> catalogue() {
@@ -126,10 +126,11 @@ public class CatalogSeedConfig {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(
             getClass().getResourceAsStream("/real-products.tsv"), StandardCharsets.UTF_8))) {
             reader.lines().skip(1).forEach(line -> {
-                String[] value = line.split("\\t", 9);
-                if (value.length == 9) items.add(new Seed(value[0], value[1], value[2], value[3],
+                String[] value = line.split("\\t", 10);
+                if (value.length == 10) items.add(new Seed(value[0], value[1], value[2], value[3],
                     Long.parseLong(value[4]), Long.parseLong(value[5]), value[6], value[7],
-                    List.of(value[3], value[2].toLowerCase()), null, Double.parseDouble(value[8])));
+                    List.of(value[3], value[2].toLowerCase()), "Real product", Double.parseDouble(value[8]),
+                    Long.parseLong(value[9])));
             });
         } catch (Exception exception) {
             throw new IllegalStateException("Unable to load the real product catalogue", exception);
@@ -138,5 +139,11 @@ public class CatalogSeedConfig {
     }
 
     private record Seed(String slug, String title, String brand, String category, long price, Long original,
-                        String description, String photo, List<String> tags, String badge, double rating) {}
+                        String description, String photo, List<String> tags, String badge, double rating,
+                        long reviewCount) {
+        private Seed(String slug, String title, String brand, String category, long price, Long original,
+                     String description, String photo, List<String> tags, String badge, double rating) {
+            this(slug, title, brand, category, price, original, description, photo, tags, badge, rating, 0L);
+        }
+    }
 }

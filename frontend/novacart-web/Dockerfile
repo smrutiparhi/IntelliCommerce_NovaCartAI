@@ -8,6 +8,8 @@ RUN npm ci --ignore-scripts
 
 # Copy source and build
 COPY frontend/novacart-web/ ./
+ARG VITE_RESET_INBOX_URL
+ENV VITE_RESET_INBOX_URL=$VITE_RESET_INBOX_URL
 RUN npm run build
 
 # ── Stage 2: Serve with nginx ─────────────────────────────────────────────────

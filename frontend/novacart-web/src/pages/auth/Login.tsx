@@ -11,6 +11,7 @@ import { Button } from '../../components/ui/Button'
 import { login } from '../../api/auth'
 import { useAuthStore } from '../../stores/auth-store'
 import { isApiError } from '../../lib/api-client'
+import axios from 'axios'
 
 const loginSchema = z.object({
   email: z.string().email('Enter a valid email address'),
@@ -23,6 +24,7 @@ export function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const setAuth = useAuthStore((s) => s.setAuth)
+  const passwordReset = (location.state as { passwordReset?: boolean } | null)?.passwordReset
 
   const {
     register,
@@ -39,15 +41,22 @@ export function LoginPage() {
       navigate(redirectTo, { replace: true })
     },
     onError: (error) => {
-      const message = isApiError(error)
-        ? error.response?.data.error.message
-        : 'The sign-in service is unavailable. Start the backend services and try again.'
+      const message = axios.isAxiosError(error) && error.response?.status === 429
+        ? 'Too many attempts. Wait a moment, then try again.'
+        : isApiError(error)
+          ? error.response?.data.error.message
+          : 'The sign-in service is unavailable. Try again shortly.'
       setError('root', { message: message ?? 'Login failed' })
     },
   })
 
   return (
     <AuthLayout title="Welcome back" subtitle="Sign in to continue to NovaCart AI">
+      {passwordReset && (
+        <p role="status" className="mb-4 rounded-md bg-emerald-500/10 px-3 py-2 text-body-sm text-emerald-700 dark:text-emerald-300">
+          Password updated. Sign in with your new password.
+        </p>
+      )}
       <form onSubmit={handleSubmit((data) => mutation.mutate(data))} className="flex flex-col gap-4" noValidate>
         <FormField label="Email" htmlFor="email" error={errors.email?.message}>
           <Input id="email" type="email" autoComplete="email" error={!!errors.email} {...register('email')} />
